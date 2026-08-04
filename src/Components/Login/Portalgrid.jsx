@@ -1,0 +1,55 @@
+import {LogIn} from "lucide-react";
+
+const portals = [
+  {label: "Academy Teacher", color: "bg-[#2da5d8]"},
+  {label: "School Teacher", color: "bg-[#2fb285]"},
+  {label: "Academy Student", color: "bg-[#f39c12]"},
+  {label: "School Student", color: "bg-[#e24a8d]"},
+  {label: "Employee Portal", color: "bg-[#635bff]"},
+  {label: "Project Leader", color: "bg-[#17a2b8]"},
+  {label: "Project Member", color: "bg-[#8b5cf6]"},
+  {label: "StudyPoint User", color: "bg-[#e55353]"},
+];
+
+export default function PortalGrid() {
+  return (
+    <div className="w-80 rounded-[28px] bg-white p-6 shadow-xl shadow-slate-200/70 border border-slate-100/80 flex flex-col justify-between">
+      <div>
+        {/* Header Title */}
+        <div className="mb-5 flex items-center gap-2">
+          <LogIn className="h-4 w-4 text-[#f28c00]" />
+          <h2 className="text-xs font-black tracking-wider text-[#f28c00] uppercase">
+            APPLICATIONS &amp; PORTALS
+          </h2>
+        </div>
+
+        {/* Tab Switcher */}
+        <div className="mb-5 flex rounded-xl bg-[#f1f4f9] p-1 text-xs font-semibold">
+          <button className="flex-1 rounded-lg bg-[#f28c00] py-2 text-white shadow-sm transition-all">
+            Portals
+          </button>
+          <button className="flex-1 rounded-lg py-2 text-slate-400 cursor-not-allowed">
+            Android
+          </button>
+          <button className="flex-1 rounded-lg py-2 text-slate-400 cursor-not-allowed">
+            iOS
+          </button>
+        </div>
+
+        {/* Portals Buttons Grid */}
+        <div className="grid grid-cols-2 gap-3">
+          {portals.map((p) => (
+            <button
+              key={p.label}
+              type="button"
+              className={`${p.color} flex h-20 flex-col items-center justify-center gap-1.5 rounded-2xl px-2 text-center text-[11px] font-bold leading-tight text-white shadow-sm transition-transform duration-200 hover:scale-[1.03] active:scale-95`}
+            >
+              <LogIn className="h-4 w-4 opacity-90 stroke-[2.5]" />
+              <span>{p.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
