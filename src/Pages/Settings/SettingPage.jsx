@@ -1,7 +1,6 @@
 import {useState} from "react";
 import SettingsSidebar from "./SettingsSidebar";
 
-import AddCustomer from "./Customer/AddCustomer"; // Adjust path as needed
 import AddProductType from "./product/AddProductType";
 import AddUnitType from "./Unit/AddUnitType";
 import AddBrand from "./Brand/AddBrand";
@@ -23,8 +22,6 @@ const SettingPage = () => {
       {/* 2. Main Content Container */}
       <div className="flex-1 rounded-2xl bg-white p-6 shadow-sm border border-slate-200">
         {activeTab === "vendor" && <AddVendor />}
-
-        {activeTab === "customer" && <AddCustomer />}
 
         {activeTab === "BrandName" && <AddBrand />}
 

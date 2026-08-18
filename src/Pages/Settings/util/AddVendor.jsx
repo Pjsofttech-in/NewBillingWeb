@@ -10,11 +10,15 @@ import {
 } from "../../../api/vendorServiceApi";
 import Toast from "../../../Components/Toast";
 import VendorModal from "./VendorModal";
+import Pagination from "../../../Components/Pagination";
+import DeleteConfirmModal from "../../../Components/DeleteConfirmModal";
+import {usePagination} from "../../../hooks/usePagination";
 
 const AddVendor = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedVendor, setSelectedVendor] = useState(null);
+  const [vendorToDelete, setVendorToDelete] = useState(null);
   const [toast, setToast] = useState(null);
 
   const queryClient = useQueryClient();
@@ -33,6 +37,20 @@ const AddVendor = () => {
     queryKey: ["vendors"],
     queryFn: fetchVendors,
   });
+
+  // Search Filter
+  const filteredVendors = vendors.filter((v) => {
+    const term = searchTerm.toLowerCase();
+    return (
+      v.vendorName?.toLowerCase().includes(term) ||
+      v.companyName?.toLowerCase().includes(term) ||
+      v.city?.toLowerCase().includes(term) ||
+      v.phone?.includes(term)
+    );
+  });
+
+  // Pagination hook
+  const pagination = usePagination(filteredVendors, 10, searchTerm);
 
   // 2. Create Vendor Mutation
   const createVendorMutation = useMutation({
@@ -72,6 +90,7 @@ const AddVendor = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({queryKey: ["vendors"]});
       showToast("Vendor deleted successfully!");
+      setVendorToDelete(null);
     },
     onError: (err) => {
       showToast(
@@ -111,22 +130,11 @@ const AddVendor = () => {
     }
   };
 
-  const handleDeleteVendor = (id) => {
-    if (window.confirm("Are you sure you want to delete this vendor?")) {
-      deleteVendorMutation.mutate(id);
+  const handleConfirmDelete = () => {
+    if (vendorToDelete) {
+      deleteVendorMutation.mutate(vendorToDelete.id);
     }
   };
-
-  // Search Filter
-  const filteredVendors = vendors.filter((v) => {
-    const term = searchTerm.toLowerCase();
-    return (
-      v.vendorName?.toLowerCase().includes(term) ||
-      v.companyName?.toLowerCase().includes(term) ||
-      v.city?.toLowerCase().includes(term) ||
-      v.phone?.includes(term)
-    );
-  });
 
   return (
     <div className="space-y-6">
@@ -202,14 +210,14 @@ const AddVendor = () => {
                   {error?.message || "Error loading vendors."}
                 </td>
               </tr>
-            ) : filteredVendors.length > 0 ? (
-              filteredVendors.map((vendor, index) => (
+            ) : pagination.paginatedData.length > 0 ? (
+              pagination.paginatedData.map((vendor, index) => (
                 <tr
                   key={vendor.id || index}
                   className="hover:bg-slate-50/80"
                 >
                   <td className="px-4 py-3 font-medium text-slate-500">
-                    {index + 1}
+                    {pagination.startIndex + index + 1}
                   </td>
                   <td className="px-4 py-3 font-bold text-slate-800">
                     {vendor.vendorName}
@@ -236,7 +244,7 @@ const AddVendor = () => {
                         <Edit className="h-4 w-4" />
                       </button>
                       <button
-                        onClick={() => handleDeleteVendor(vendor.id)}
+                        onClick={() => setVendorToDelete(vendor)}
                         disabled={deleteVendorMutation.isPending}
                         className="rounded p-1.5 text-red-500 hover:bg-red-50 hover:text-red-700 cursor-pointer disabled:opacity-50"
                         title="Delete Vendor"
@@ -264,6 +272,21 @@ const AddVendor = () => {
         </table>
       </div>
 
+      {/* Reusable Pagination Controls */}
+      {!isLoading && !isError && (
+        <Pagination
+          currentPage={pagination.currentPage}
+          totalPages={pagination.totalPages}
+          totalItems={pagination.totalItems}
+          startIndex={pagination.startIndex}
+          endIndex={pagination.endIndex}
+          itemsPerPage={pagination.itemsPerPage}
+          onPageChange={pagination.setCurrentPage}
+          onItemsPerPageChange={pagination.setItemsPerPage}
+          itemName="vendors"
+        />
+      )}
+
       {/* Modal Dialog Form */}
       <VendorModal
         isOpen={isModalOpen}
@@ -273,6 +296,15 @@ const AddVendor = () => {
         isSubmitting={
           createVendorMutation.isPending || updateVendorMutation.isPending
         }
+      />
+
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmModal
+        isOpen={Boolean(vendorToDelete)}
+        itemName={vendorToDelete?.vendorName}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setVendorToDelete(null)}
+        isLoading={deleteVendorMutation.isPending}
       />
     </div>
   );

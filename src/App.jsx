@@ -7,11 +7,12 @@ import Dashboard from "./Pages/Dashboard/Dashboard";
 import ProtectedRoute from "./ProtectedRoutes/ProtectedRoutes";
 import AddProduct from "./Pages/Produt/AddProduct";
 import OrderPage from "./Pages/Order/OrderPage";
+import Shipment from "./Pages/Shipment/Shipment";
 
 const App = () => {
   const {isAuthenticated} = useAuth();
   return (
-    <div>
+    <div className="min-h-screen w-full bg-slate-100 text-slate-900 antialiased">
       <Routes>
         <Route
           path="/login"
@@ -47,6 +48,10 @@ const App = () => {
             <Route
               path="order"
               element={<OrderPage />}
+            />
+            <Route
+              path="shipment"
+              element={<Shipment />}
             />
           </Route>
         </Route>

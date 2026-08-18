@@ -9,10 +9,12 @@ import {
 } from "../../../api/productTypeServiceApi";
 import Toast from "../../../Components/Toast";
 import ProductTypeModal from "../product/ProductTypeModal";
+import DeleteConfirmModal from "../../../Components/DeleteConfirmModal";
 
 const AddProductType = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [productTypeToDelete, setProductTypeToDelete] = useState(null);
   const [toast, setToast] = useState(null);
 
   const queryClient = useQueryClient();
@@ -21,7 +23,7 @@ const AddProductType = () => {
     setToast({message, type});
   };
 
-  // 1. Fetch Product Types using TanStack Query
+  // 1. Fetch Product Types
   const {
     data: productTypes = [],
     isLoading,
@@ -54,6 +56,7 @@ const AddProductType = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({queryKey: ["productTypes"]});
       showToast("Product Type deleted successfully!");
+      setProductTypeToDelete(null);
     },
     onError: (err) => {
       showToast(
@@ -64,13 +67,13 @@ const AddProductType = () => {
   });
 
   // Action Handlers
-  const handleCreateProductType = async (data) => {
-    await createProductTypeMutation.mutateAsync(data);
+  const handleCreateProductType = async (formData) => {
+    await createProductTypeMutation.mutateAsync(formData);
   };
 
-  const handleDeleteProductType = (id) => {
-    if (window.confirm("Are you sure you want to delete this product type?")) {
-      deleteProductTypeMutation.mutate(id);
+  const handleConfirmDelete = () => {
+    if (productTypeToDelete) {
+      deleteProductTypeMutation.mutate(productTypeToDelete.id);
     }
   };
 
@@ -94,29 +97,29 @@ const AddProductType = () => {
       )}
 
       {/* Header Bar */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between pb-4 border-b">
+      <div className="flex flex-col gap-4 border-b pb-4 sm:flex-row sm:items-center sm:justify-between">
         {/* Search Bar */}
         <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
             placeholder="Search Product Type..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 text-sm border rounded-full outline-none focus:ring-2 focus:ring-blue-500 border-slate-300"
+            className="w-full rounded-full border border-slate-300 py-2 pl-9 pr-4 text-sm outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
 
         {/* Action Button & Counter */}
         <div className="flex items-center gap-3">
-          <span className="rounded-full bg-blue-50 border border-blue-200 px-3 py-1.5 text-xs font-bold text-blue-700">
+          <span className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700">
             Total Product Types : {filteredProductTypes.length}
           </span>
 
           <button
             type="button"
             onClick={() => setIsModalOpen(true)}
-            className="flex items-center gap-2 rounded-lg bg-[#0073b7] hover:bg-[#0867a0] px-4 py-2 text-sm font-semibold text-white shadow transition-all cursor-pointer"
+            className="flex cursor-pointer items-center gap-2 rounded-lg bg-[#0073b7] px-4 py-2 text-sm font-semibold text-white shadow transition-all hover:bg-[#0867a0]"
           >
             <Plus className="h-4 w-4" />
             ADD PRODUCT TYPE
@@ -127,12 +130,12 @@ const AddProductType = () => {
       {/* Product Type Table */}
       <div className="overflow-x-auto rounded-xl border border-slate-200 shadow-xs">
         <table className="w-full text-left text-sm text-slate-700">
-          <thead className="bg-slate-50 text-xs uppercase text-slate-500 border-b border-slate-200">
+          <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase text-slate-500">
             <tr>
               <th className="px-4 py-3 font-semibold">S.No.</th>
               <th className="px-4 py-3 font-semibold">Type ID</th>
               <th className="px-4 py-3 font-semibold">Product Type</th>
-              <th className="px-4 py-3 font-semibold text-center">Action</th>
+              <th className="px-4 py-3 text-center font-semibold">Action</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -140,7 +143,7 @@ const AddProductType = () => {
               <tr>
                 <td
                   colSpan="4"
-                  className="text-center py-8 text-slate-400"
+                  className="py-8 text-center text-slate-400"
                 >
                   Fetching product type data...
                 </td>
@@ -149,7 +152,7 @@ const AddProductType = () => {
               <tr>
                 <td
                   colSpan="4"
-                  className="text-center py-8 text-red-500"
+                  className="py-8 text-center text-red-500"
                 >
                   {error?.message || "Error loading product types."}
                 </td>
@@ -165,14 +168,13 @@ const AddProductType = () => {
                   </td>
                   <td className="px-4 py-3 text-slate-600">#{pt.id}</td>
                   <td className="px-4 py-3 font-bold text-slate-800">
-                    {/* Fallback chain guarantees value renders correctly */}
                     {pt.typeName || pt.productType || pt.name || "N/A"}
                   </td>
                   <td className="px-4 py-3 text-center">
                     <button
-                      onClick={() => handleDeleteProductType(pt.id)}
+                      onClick={() => setProductTypeToDelete(pt)}
                       disabled={deleteProductTypeMutation.isPending}
-                      className="rounded p-1.5 text-red-500 hover:bg-red-50 hover:text-red-700 cursor-pointer disabled:opacity-50"
+                      className="cursor-pointer rounded p-1.5 text-red-500 hover:bg-red-50 hover:text-red-700 disabled:opacity-50"
                       title="Delete Product Type"
                     >
                       <Trash2 className="h-4 w-4" />
@@ -184,7 +186,7 @@ const AddProductType = () => {
               <tr>
                 <td
                   colSpan="4"
-                  className="text-center py-12 text-slate-400"
+                  className="py-12 text-center text-slate-400"
                 >
                   <div className="flex flex-col items-center gap-2">
                     <Package className="h-10 w-10 stroke-1 text-slate-300" />
@@ -203,6 +205,19 @@ const AddProductType = () => {
         onClose={() => setIsModalOpen(false)}
         onSubmit={handleCreateProductType}
         isSubmitting={createProductTypeMutation.isPending}
+      />
+
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmModal
+        isOpen={Boolean(productTypeToDelete)}
+        itemName={
+          productTypeToDelete?.typeName ||
+          productTypeToDelete?.productType ||
+          productTypeToDelete?.name
+        }
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setProductTypeToDelete(null)}
+        isLoading={deleteProductTypeMutation.isPending}
       />
     </div>
   );

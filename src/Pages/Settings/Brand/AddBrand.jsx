@@ -9,10 +9,14 @@ import {
 } from "../../../api/brandServiceApi";
 import Toast from "../../../Components/Toast";
 import BrandModal from "./BrandModal";
+import Pagination from "../../../Components/Pagination";
+import DeleteConfirmModal from "../../../Components/DeleteConfirmModal";
+import {usePagination} from "../../../hooks/usePagination";
 
 const AddBrand = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [brandToDelete, setBrandToDelete] = useState(null);
   const [toast, setToast] = useState(null);
 
   const queryClient = useQueryClient();
@@ -31,6 +35,14 @@ const AddBrand = () => {
     queryKey: ["brands"],
     queryFn: fetchBrands,
   });
+
+  // Search Filter
+  const filteredBrands = brands.filter((brand) =>
+    brand.brandName?.toLowerCase().includes(searchTerm.toLowerCase()),
+  );
+
+  // Pagination hook
+  const pagination = usePagination(filteredBrands, 10, searchTerm);
 
   // 2. Create Brand Mutation
   const createBrandMutation = useMutation({
@@ -54,6 +66,7 @@ const AddBrand = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({queryKey: ["brands"]});
       showToast("Brand deleted successfully!");
+      setBrandToDelete(null);
     },
     onError: (err) => {
       showToast(
@@ -68,16 +81,11 @@ const AddBrand = () => {
     await createBrandMutation.mutateAsync(data);
   };
 
-  const handleDeleteBrand = (id) => {
-    if (window.confirm("Are you sure you want to delete this brand?")) {
-      deleteBrandMutation.mutate(id);
+  const handleConfirmDelete = () => {
+    if (brandToDelete) {
+      deleteBrandMutation.mutate(brandToDelete.id);
     }
   };
-
-  // Search Filter
-  const filteredBrands = brands.filter((brand) =>
-    brand.brandName?.toLowerCase().includes(searchTerm.toLowerCase()),
-  );
 
   return (
     <div className="space-y-6">
@@ -151,14 +159,14 @@ const AddBrand = () => {
                   {error?.message || "Error loading brands."}
                 </td>
               </tr>
-            ) : filteredBrands.length > 0 ? (
-              filteredBrands.map((brand, index) => (
+            ) : pagination.paginatedData.length > 0 ? (
+              pagination.paginatedData.map((brand, index) => (
                 <tr
                   key={brand.id || index}
                   className="hover:bg-slate-50/80"
                 >
                   <td className="px-4 py-3 font-medium text-slate-500">
-                    {index + 1}
+                    {pagination.startIndex + index + 1}
                   </td>
                   <td className="px-4 py-3 text-slate-600">#{brand.id}</td>
                   <td className="px-4 py-3 font-bold text-slate-800">
@@ -166,7 +174,7 @@ const AddBrand = () => {
                   </td>
                   <td className="px-4 py-3 text-center">
                     <button
-                      onClick={() => handleDeleteBrand(brand.id)}
+                      onClick={() => setBrandToDelete(brand)}
                       disabled={deleteBrandMutation.isPending}
                       className="rounded p-1.5 text-red-500 hover:bg-red-50 hover:text-red-700 cursor-pointer disabled:opacity-50"
                       title="Delete Brand"
@@ -193,12 +201,36 @@ const AddBrand = () => {
         </table>
       </div>
 
+      {/* Pagination Controls */}
+      {!isLoading && !isError && (
+        <Pagination
+          currentPage={pagination.currentPage}
+          totalPages={pagination.totalPages}
+          totalItems={pagination.totalItems}
+          startIndex={pagination.startIndex}
+          endIndex={pagination.endIndex}
+          itemsPerPage={pagination.itemsPerPage}
+          onPageChange={pagination.setCurrentPage}
+          onItemsPerPageChange={pagination.setItemsPerPage}
+          itemName="brands"
+        />
+      )}
+
       {/* Brand Modal */}
       <BrandModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSubmit={handleCreateBrand}
         isSubmitting={createBrandMutation.isPending}
+      />
+
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmModal
+        isOpen={Boolean(brandToDelete)}
+        itemName={brandToDelete?.brandName}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setBrandToDelete(null)}
+        isLoading={deleteBrandMutation.isPending}
       />
     </div>
   );

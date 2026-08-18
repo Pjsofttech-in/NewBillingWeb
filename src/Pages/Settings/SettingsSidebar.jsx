@@ -1,9 +1,9 @@
 import {useState} from "react";
-import {Layers, Ruler, Store, Tag, UserPlus} from "lucide-react";
+import {Layers, Ruler, Store, Tag, Truck  } from "lucide-react";
 
 const sidebarItems = [
   {id: "vendor", label: "Add Vendor", icon: Store},
-  {id: "customer", label: "Add Customer", icon: UserPlus},
+  {id: "shipment", label: "Shipment", icon: Truck},
   {id: "BrandName", label: "Add Brand Name", icon: Tag},
   {id: "UnitType", label: "Add Unit Type", icon: Ruler},
   {id: "productType", label: "Add Product Type", icon: Layers},

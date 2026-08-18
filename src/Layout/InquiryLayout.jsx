@@ -14,13 +14,13 @@ const InquiryLayout = () => {
       {/* Top Main Navbar */}
       <Navbar />
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden relative">
         <Sidebar />
 
-        <div className="flex flex-1 flex-col overflow-y-auto">
+        <div className="flex flex-1 flex-col overflow-y-auto w-full min-w-0">
           {!isProfilePage && <InquiryHeader />}
 
-          <main className="flex-1 p-4 sm:p-6">
+          <main className="flex-1 p-2 sm:p-4 w-full">
             <Outlet />
           </main>
           <Footer />
