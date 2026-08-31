@@ -1,5 +1,5 @@
 import {useState, useMemo} from "react";
-import {Plus, Edit2, Trash2, UserCheck, Search, XCircle} from "lucide-react";
+import {Plus, Edit2, Trash2, Search, XCircle} from "lucide-react";
 
 const CustomerList = ({
   customers = [],
@@ -23,11 +23,6 @@ const CustomerList = ({
       const city = cust.city?.toLowerCase() || "";
       const state = cust.state?.toLowerCase() || "";
       const landmark = cust.landmark?.toLowerCase() || "";
-      const vendorName = (
-        cust.vendorName ||
-        cust.companyName ||
-        ""
-      ).toLowerCase();
 
       return (
         name.includes(query) ||
@@ -35,8 +30,7 @@ const CustomerList = ({
         phone.includes(query) ||
         city.includes(query) ||
         state.includes(query) ||
-        landmark.includes(query) ||
-        vendorName.includes(query)
+        landmark.includes(query)
       );
     });
   }, [customers, searchQuery]);
@@ -50,7 +44,7 @@ const CustomerList = ({
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
           <input
             type="text"
-            placeholder="Search Customer Name, Phone, Email, City..."
+            placeholder="Search Customer Name, Email, City..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-9 pr-9 py-2 text-sm border rounded-full outline-none focus:ring-2 focus:ring-blue-500 border-slate-300 bg-white"
@@ -93,7 +87,6 @@ const CustomerList = ({
               <th className="px-4 py-3.5">Customer Name</th>
               <th className="px-4 py-3.5">Contact Details</th>
               <th className="px-4 py-3.5">Location</th>
-              <th className="px-4 py-3.5">Assigned Vendor</th>
               <th className="px-4 py-3.5 text-right">Actions</th>
             </tr>
           </thead>
@@ -101,7 +94,7 @@ const CustomerList = ({
             {isLoading ? (
               <tr>
                 <td
-                  colSpan="6"
+                  colSpan="5"
                   className="text-center py-8 text-gray-500"
                 >
                   Loading customer records...
@@ -110,7 +103,7 @@ const CustomerList = ({
             ) : customers.length === 0 ? (
               <tr>
                 <td
-                  colSpan="6"
+                  colSpan="5"
                   className="text-center py-8 text-gray-500"
                 >
                   No customers found. Click <strong>ADD CUSTOMER</strong> to add
@@ -120,7 +113,7 @@ const CustomerList = ({
             ) : filteredCustomers.length === 0 ? (
               <tr>
                 <td
-                  colSpan="6"
+                  colSpan="5"
                   className="text-center py-8 text-gray-500"
                 >
                   No customers matching &quot;
@@ -159,14 +152,6 @@ const CustomerList = ({
                         </span>
                       )}
                     </div>
-                  </td>
-                  <td className="px-4 py-3.5">
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold bg-blue-50 text-blue-700 rounded-md border border-blue-200">
-                      <UserCheck className="w-3 h-3" />
-                      {cust.vendorName ||
-                        cust.companyName ||
-                        `Vendor #${cust.vendorId}`}
-                    </span>
                   </td>
                   <td className="px-4 py-3.5 text-right space-x-2">
                     <button

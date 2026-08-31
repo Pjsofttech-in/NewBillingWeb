@@ -1,10 +1,10 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { fetchAllProducts } from "../../api/productApi";
-import { fetchBrands } from "../../api/brandServiceApi";
-import { fetchVendors } from "../../api/vendorServiceApi";
-import { fetchUnitTypes } from "../../api/unitTypeServiceApi";
-import { fetchProductTypes } from "../../api/productTypeServiceApi";
+import {useState} from "react";
+import {useQuery} from "@tanstack/react-query";
+import {fetchAllProducts} from "../../api/productApi";
+import {fetchBrands} from "../../api/brandServiceApi";
+import {fetchVendors} from "../../api/vendorServiceApi";
+import {fetchUnitTypes} from "../../api/unitTypeServiceApi";
+import {fetchProductTypes} from "../../api/productTypeServiceApi";
 
 import ProductList from "./ProductList";
 import ProductModal from "./ProductModal";
@@ -26,19 +26,19 @@ const AddProduct = () => {
   const [toast, setToast] = useState(null);
 
   // Fetch dropdown list options
-  const { data: productTypes = [] } = useQuery({
+  const {data: productTypes = []} = useQuery({
     queryKey: ["productTypes"],
     queryFn: fetchProductTypes,
   });
-  const { data: brands = [] } = useQuery({
+  const {data: brands = []} = useQuery({
     queryKey: ["brands"],
     queryFn: fetchBrands,
   });
-  const { data: vendors = [] } = useQuery({
+  const {data: vendors = []} = useQuery({
     queryKey: ["vendors"],
     queryFn: fetchVendors,
   });
-  const { data: unitTypes = [] } = useQuery({
+  const {data: unitTypes = []} = useQuery({
     queryKey: ["unitTypes"],
     queryFn: fetchUnitTypes,
   });
@@ -55,7 +55,7 @@ const AddProduct = () => {
   });
 
   const handleFilterChange = (key, value) => {
-    setFilters((prev) => ({ ...prev, [key]: value }));
+    setFilters((prev) => ({...prev, [key]: value}));
   };
 
   const handleResetFilters = () => {
@@ -68,7 +68,7 @@ const AddProduct = () => {
     });
   };
 
-  const showToast = (message, type = "success") => setToast({ message, type });
+  const showToast = (message, type = "success") => setToast({message, type});
 
   const typeOptions = productTypes.map((t) => ({
     label: t.typeName || t.name,
@@ -88,7 +88,7 @@ const AddProduct = () => {
   }));
 
   return (
-    <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 space-y-4">
+    <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-4 space-y-4">
       {toast && (
         <Toast
           message={toast.message}
@@ -102,7 +102,7 @@ const AddProduct = () => {
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b pb-3">
           {/* Left: Title & Reset */}
           <div className="flex items-center gap-3">
-            <span className="text-sm font-bold text-gray-700">
+            <span className="text-lg font-bold text-gray-700">
               Filter Products
             </span>
             <span className="bg-blue-50 text-blue-700 px-2.5 py-1 rounded-md text-xs font-semibold border border-blue-100">

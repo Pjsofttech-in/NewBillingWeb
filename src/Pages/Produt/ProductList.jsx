@@ -4,7 +4,9 @@ import {deleteProduct} from "../../api/productApi";
 import Toast from "../../Components/Toast";
 import DeleteConfirmModal from "../../Components/DeleteConfirmModal";
 import UpdateStockModal from "./UpdateStockModal";
-import StockHistoryModal from "./StockHistoryModal"; // <- १. Import जोडला
+import ProductDetailsModal from "./ProductDetailsModal";
+import BatchListModal from "./BatchListModal";
+import VendorBillModal from "./VendorBillModal";
 import Pagination from "../../Components/Pagination";
 import {usePagination} from "../../hooks/usePagination";
 
@@ -13,7 +15,9 @@ const ProductList = ({products = []}) => {
   const [toast, setToast] = useState(null);
   const [productToDelete, setProductToDelete] = useState(null);
   const [productToUpdateStock, setProductToUpdateStock] = useState(null);
-  const [productForHistory, setProductForHistory] = useState(null); // <- २. State जोडली
+  const [productForDetails, setProductForDetails] = useState(null);
+  const [productForBatches, setProductForBatches] = useState(null);
+  const [showVendorBills, setShowVendorBills] = useState(false);
 
   const pagination = usePagination(products, 10);
 
@@ -44,6 +48,9 @@ const ProductList = ({products = []}) => {
 
   return (
     <div className="space-y-4">
+      <div className="flex justify-end">
+        <button onClick={() => setShowVendorBills(true)} className="px-3 py-2 text-xs font-bold rounded-lg bg-slate-900 text-white hover:bg-slate-800">Vendor Bills</button>
+      </div>
       {toast && (
         <Toast
           message={toast.message}
@@ -69,11 +76,21 @@ const ProductList = ({products = []}) => {
         onSuccess={() => showToast("Stock updated!", "success")}
       />
 
-      {/* ३. Stock History Modal जोडला */}
-      <StockHistoryModal
-        isOpen={Boolean(productForHistory)}
-        product={productForHistory}
-        onClose={() => setProductForHistory(null)}
+      <ProductDetailsModal
+        isOpen={Boolean(productForDetails)}
+        product={productForDetails}
+        onClose={() => setProductForDetails(null)}
+      />
+
+      <BatchListModal
+        isOpen={Boolean(productForBatches)}
+        product={productForBatches}
+        onClose={() => setProductForBatches(null)}
+      />
+
+      <VendorBillModal
+        isOpen={showVendorBills}
+        onClose={() => setShowVendorBills(false)}
       />
 
       {/* MOBILE CARD VIEW */}
@@ -85,6 +102,13 @@ const ProductList = ({products = []}) => {
           const customerPrice = item.customerPrice ?? item.price ?? 0;
           const gst = item.totalGstPercentage ?? item.gstPercentage ?? 0;
           const margin = customerPrice - storePrice;
+          const stock = item.stock ?? 0;
+          const stockStatus =
+            stock <= 0
+              ? { label: "Out of stock", className: "bg-red-50 text-red-700 border-red-200" }
+              : stock <= 10
+                ? { label: "Low stock", className: "bg-amber-50 text-amber-700 border-amber-200" }
+                : { label: "In stock", className: "bg-emerald-50 text-emerald-700 border-emerald-200" };
 
           return (
             <div
@@ -114,13 +138,14 @@ const ProductList = ({products = []}) => {
                 </div>
 
                 <div className="flex gap-1.5 shrink-0 flex-wrap justify-end">
-                  {/* Mobile View - History Button */}
                   <button
-                    onClick={() => setProductForHistory(item)}
-                    className="text-xs font-semibold bg-purple-50 text-purple-700 px-2 py-1.5 rounded-md hover:bg-purple-100 transition"
+                    onClick={() => setProductForDetails(item)}
+                    className="text-xs font-semibold bg-blue-50 text-blue-700 px-2 py-1.5 rounded-md hover:bg-blue-100 transition"
                   >
-                    History
+                    View
                   </button>
+                  {/* Mobile View - History Button */}
+                  <button onClick={() => setProductForBatches(item)} className="text-xs font-semibold bg-indigo-50 text-indigo-700 px-2 py-1.5 rounded-md hover:bg-indigo-100 transition">History</button>
                   <button
                     onClick={() => setProductToUpdateStock(item)}
                     className="text-xs font-semibold bg-emerald-50 text-emerald-700 px-2 py-1.5 rounded-md hover:bg-emerald-100 transition"
@@ -163,9 +188,14 @@ const ProductList = ({products = []}) => {
                     {item.stock ?? 0} {item.unitType?.unitType || ""}
                   </strong>
                 </span>
-                <span className="font-semibold text-gray-700">
-                  {item.gstApplicable ? `${gst}% GST` : "No GST"}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className={`px-2 py-0.5 rounded border text-[10px] font-bold ${stockStatus.className}`}>
+                    {stockStatus.label}
+                  </span>
+                  <span className="font-semibold text-gray-700">
+                    {item.gstApplicable ? `${gst}% GST` : "No GST"}
+                  </span>
+                </div>
               </div>
             </div>
           );
@@ -266,9 +296,12 @@ const ProductList = ({products = []}) => {
                   </td>
 
                   <td className="px-3 py-3">
-                    <span className="font-bold text-gray-900 text-sm">
-                      {item.stock ?? 0} {item.unitType?.unitType || ""}
+                    <span className="font-bold text-gray-900 text-sm block">
+                     {item.stock ?? 0} {item.unitType?.unitType || ""}
                     </span>
+                    {/* <span className={`inline-block mt-1 px-1.5 py-0.5 rounded border text-[10px] font-bold ${stockStatus.className}`}>
+                      {stockStatus.label}
+                    </span> */}
                   </td>
 
                   <td className="px-3 py-3 text-gray-800 text-xs font-medium max-w-28 truncate">
@@ -284,13 +317,14 @@ const ProductList = ({products = []}) => {
 
                   <td className="px-3 py-3 text-right">
                     <div className="flex justify-end gap-1.5">
-                      {/* Desktop View - History Button */}
                       <button
-                        onClick={() => setProductForHistory(item)}
-                        className="text-xs font-semibold text-purple-700 border border-purple-400 bg-purple-50 hover:bg-purple-100 px-2.5 py-1.5 rounded-lg transition"
+                        onClick={() => setProductForDetails(item)}
+                        className="text-xs font-semibold text-blue-700 border border-blue-300 bg-blue-50 hover:bg-blue-100 px-2.5 py-1.5 rounded-lg transition"
                       >
-                        History
+                        View
                       </button>
+                      {/* Desktop View - History Button */}
+                      <button onClick={() => setProductForBatches(item)} className="text-xs font-semibold text-indigo-700 border border-indigo-300 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1.5 rounded-lg transition">History</button>
                       <button
                         onClick={() => setProductToUpdateStock(item)}
                         className="text-xs font-semibold text-emerald-700 border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1.5 rounded-lg transition"

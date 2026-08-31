@@ -8,7 +8,7 @@ import {
   deleteProductType,
 } from "../../../api/productTypeServiceApi";
 import Toast from "../../../Components/Toast";
-import ProductTypeModal from "../product/ProductTypeModal";
+import ProductTypeModal from "./ProductTypeModal";
 import DeleteConfirmModal from "../../../Components/DeleteConfirmModal";
 
 const AddProductType = () => {

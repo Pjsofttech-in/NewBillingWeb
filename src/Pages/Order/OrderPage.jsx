@@ -1,39 +1,31 @@
 import {useState, useCallback} from "react";
+import {useNavigate} from "react-router-dom";
 import {useQuery, useMutation, useQueryClient} from "@tanstack/react-query";
 
-// APIs
 import {fetchOrders, createOrder, deleteOrder} from "../../api/orderApi";
 import {fetchCustomers, createCustomer} from "../../api/customerApi";
-import {fetchVendors} from "../../api/vendorServiceApi";
-import {fetchAllProducts} from "../../api/productApi"; // 1. Imported correct API function
+import {fetchAllProducts} from "../../api/productApi";
 
-// UI Components
 import OrderList from "./OrderList";
 import CreateOrderModal from "./CreateOrderModal";
 import PaymentModal from "../Payment/PaymentModal";
 import InvoiceModal from "../Payment/InvoiceModal";
-
 import Toast from "../../Components/Toast";
 
 const OrderPage = () => {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
-  // Modals States
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [isInvoiceOpen, setIsInvoiceOpen] = useState(false);
-
-  // Selected Order State for Modals
   const [selectedOrder, setSelectedOrder] = useState(null);
-
-  // Toast Notification State
   const [toast, setToast] = useState(null);
 
   const showToast = useCallback((message, type = "success") => {
     setToast({message, type});
   }, []);
 
-  // 1. React Queries for Page Data
   const {data: orders = [], isLoading: loadingOrders} = useQuery({
     queryKey: ["orders"],
     queryFn: fetchOrders,
@@ -46,7 +38,6 @@ const OrderPage = () => {
     retry: 1,
   });
 
-  // 2. Updated to use fetchAllProducts from productApi.js
   const {
     data: products = [],
     isLoading: loadingProducts,
@@ -58,16 +49,7 @@ const OrderPage = () => {
     retry: 1,
   });
 
-  const {data: vendors = []} = useQuery({
-    queryKey: ["vendors"],
-    queryFn: fetchVendors,
-    retry: 1,
-  });
-
-  // 2. Mutations
-  const createCustomerMutation = useMutation({
-    mutationFn: createCustomer,
-  });
+  const createCustomerMutation = useMutation({mutationFn: createCustomer});
 
   const createOrderMutation = useMutation({
     mutationFn: createOrder,
@@ -78,6 +60,7 @@ const OrderPage = () => {
       setIsModalOpen(false);
       showToast("Order Created Successfully!", "success");
     },
+    onError: (err) => showToast(err.response?.data?.message || err.message || "Unable to create order", "error"),
   });
 
   const deleteOrderMutation = useMutation({
@@ -87,54 +70,29 @@ const OrderPage = () => {
       queryClient.invalidateQueries({queryKey: ["products"]});
       showToast("Order deleted successfully", "success");
     },
-    onError: (err) => {
-      showToast(
-        "Error deleting order: " + (err.response?.data?.message || err.message),
-        "error",
-      );
-    },
+    onError: (err) => showToast("Error deleting order: " + (err.response?.data?.message || err.message), "error"),
   });
 
-  // 3. Handlers
-  const handleOrderSubmit = async (
-    orderPayload,
-    isNewCustomer,
-    customerPayload,
-  ) => {
+  const handleOrderSubmit = async (orderPayload, isNewCustomer, customerPayload) => {
     let finalCustomerId = orderPayload.customer?.id;
-
     if (isNewCustomer && customerPayload) {
-      const newCustomerRes =
-        await createCustomerMutation.mutateAsync(customerPayload);
+      const newCustomerRes = await createCustomerMutation.mutateAsync(customerPayload);
       finalCustomerId = newCustomerRes.id;
     }
-
-    const finalOrderPayload = {
+    await createOrderMutation.mutateAsync({
       ...orderPayload,
-      customer: {
-        id: finalCustomerId,
-      },
-    };
-
-    await createOrderMutation.mutateAsync(finalOrderPayload);
+      customer: {id: finalCustomerId},
+    });
   };
 
-  const handleDelete = async (orderId) => {
-    await deleteOrderMutation.mutateAsync(orderId);
+  const handleDelete = async (orderId) => deleteOrderMutation.mutateAsync(orderId);
+  const handleOpenPayment = (order) => { setSelectedOrder(order); setIsPaymentOpen(true); };
+  const handlePrintInvoice = (order) => { setSelectedOrder(order); setIsInvoiceOpen(true); };
+
+  const handleCreateShipment = (order) => {
+    navigate(`/shipment?orderId=${encodeURIComponent(order.id)}`);
   };
 
-  // Action Button Handlers
-  const handleOpenPayment = (order) => {
-    setSelectedOrder(order);
-    setIsPaymentOpen(true);
-  };
-
-  const handlePrintInvoice = (order) => {
-    setSelectedOrder(order);
-    setIsInvoiceOpen(true);
-  };
-
-  // Callback when payment or shipment succeeds
   const handleSuccessRefresh = () => {
     queryClient.invalidateQueries({queryKey: ["orders"]});
     queryClient.invalidateQueries({queryKey: ["products"]});
@@ -142,27 +100,14 @@ const OrderPage = () => {
 
   return (
     <>
-      {/* Toast Notification */}
-      {toast && (
-        <div className="relative z-100">
-          <Toast
-            message={toast.message}
-            type={toast.type}
-            onClose={() => setToast(null)}
-          />
-        </div>
-      )}
+      {toast && <div className="relative z-100"><Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} /></div>}
 
-      {/* Backend API Error Banner */}
       {isProductsError && (
-        <div className="m-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg text-sm">
-          <strong>Backend Error:</strong> Failed to load products (
-          {productsError?.response?.status || 500} Internal Server Error).
-          Please check your backend API at <code>/api/products</code>.
+        <div className="m-4 rounded-lg border border-red-400 bg-red-100 p-3 text-sm text-red-700">
+          <strong>Backend Error:</strong> Failed to load products ({productsError?.response?.status || 500}).
         </div>
       )}
 
-      {/* Main Order List View */}
       <OrderList
         orders={orders}
         isLoading={loadingOrders}
@@ -170,38 +115,22 @@ const OrderPage = () => {
         onDelete={handleDelete}
         onOpenPayment={handleOpenPayment}
         onPrintInvoice={handlePrintInvoice}
+        onCreateShipment={handleCreateShipment}
       />
 
-      {/* 1. Create Order Modal */}
       <CreateOrderModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSubmitOrder={handleOrderSubmit}
         customers={customers}
         products={products}
-        vendors={vendors}
         loadingCustomers={loadingCustomers}
         loadingProducts={loadingProducts}
-        isSubmitting={
-          createCustomerMutation.isPending || createOrderMutation.isPending
-        }
+        isSubmitting={createCustomerMutation.isPending || createOrderMutation.isPending}
       />
 
-      {/* 2. Payment Modal */}
-      <PaymentModal
-        isOpen={isPaymentOpen}
-        order={selectedOrder}
-        onClose={() => setIsPaymentOpen(false)}
-        onSuccess={handleSuccessRefresh}
-        showToast={showToast}
-      />
-
-      {/* 3. Invoice View Modal */}
-      <InvoiceModal
-        isOpen={isInvoiceOpen}
-        order={selectedOrder}
-        onClose={() => setIsInvoiceOpen(false)}
-      />
+      <PaymentModal isOpen={isPaymentOpen} order={selectedOrder} onClose={() => setIsPaymentOpen(false)} onSuccess={handleSuccessRefresh} showToast={showToast} />
+      <InvoiceModal isOpen={isInvoiceOpen} order={selectedOrder} onClose={() => setIsInvoiceOpen(false)} />
     </>
   );
 };

@@ -21,8 +21,6 @@ const CustomerModal = ({
   onClose,
   onSubmit,
   initialData,
-  vendors = [],
-  loadingVendors = false,
   isSubmitting = false,
 }) => {
   const {
@@ -40,7 +38,6 @@ const CustomerModal = ({
       email: "",
       phone: "",
       state: "MAHARASHTRA",
-      vendorId: "",
     },
   });
 
@@ -55,7 +52,6 @@ const CustomerModal = ({
         email: initialData.email || "",
         phone: initialData.phone || "",
         state: initialData.state || "MAHARASHTRA",
-        vendorId: initialData.vendorId || initialData.vendor?.id || "",
       });
     } else {
       reset({
@@ -67,7 +63,6 @@ const CustomerModal = ({
         email: "",
         phone: "",
         state: "MAHARASHTRA",
-        vendorId: "",
       });
     }
   }, [initialData, reset, isOpen]);
@@ -194,36 +189,6 @@ const CustomerModal = ({
               )}
             </div>
 
-            {/* Vendor Select Dropdown */}
-            <div className="w-full">
-              <label className="block mb-1 text-xs sm:text-sm font-medium text-gray-700">
-                Associated Vendor <span className="text-red-500">*</span>
-              </label>
-              <select
-                {...register("vendorId", {
-                  required: "Vendor selection is required",
-                })}
-                disabled={loadingVendors}
-                className="w-full px-3 py-2 border rounded-md text-sm border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100"
-              >
-                <option value="">
-                  {loadingVendors ? "Loading vendors..." : "Select Vendor"}
-                </option>
-                {vendors.map((v) => (
-                  <option
-                    key={v.id}
-                    value={v.id}
-                  >
-                    {v.vendorName || v.name}
-                  </option>
-                ))}
-              </select>
-              {errors.vendorId && (
-                <p className="text-xs text-red-500 mt-1">
-                  {errors.vendorId.message}
-                </p>
-              )}
-            </div>
           </div>
 
           {/* Action Buttons */}

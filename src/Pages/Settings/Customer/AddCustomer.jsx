@@ -6,7 +6,6 @@ import {
   updateCustomer,
   deleteCustomer,
 } from "../../../api/customerApi";
-import {fetchVendors} from "../../../api/vendorServiceApi";
 import CustomerList from "./CustomerList";
 import CustomerModal from "./CustomerModal";
 
@@ -19,11 +18,6 @@ const AddCustomer = () => {
   const {data: customers = [], isLoading: loadingCustomers} = useQuery({
     queryKey: ["customers"],
     queryFn: fetchCustomers,
-  });
-
-  const {data: vendors = [], isLoading: loadingVendors} = useQuery({
-    queryKey: ["vendors"],
-    queryFn: fetchVendors,
   });
 
   // Mutations
@@ -97,7 +91,6 @@ const AddCustomer = () => {
       email: data.email,
       phone: data.phone,
       state: data.state,
-      vendorId: parseInt(data.vendorId, 10),
     };
 
     if (selectedCustomer) {
@@ -122,8 +115,6 @@ const AddCustomer = () => {
         onClose={closeModal}
         onSubmit={handleFormSubmit}
         initialData={selectedCustomer}
-        vendors={vendors}
-        loadingVendors={loadingVendors}
         isSubmitting={createMutation.isPending || updateMutation.isPending}
       />
     </>

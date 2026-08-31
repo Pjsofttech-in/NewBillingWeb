@@ -9,7 +9,7 @@ import {
   Eye,
   EyeOff,
 } from "lucide-react";
-import Input from "../../Components/Form/Input"
+import Input from "../Form/Input";
 
 const iconMap = {
   mail: Mail,

@@ -1,12 +1,14 @@
 import {useState} from "react";
-import {Layers, Ruler, Store, Tag, Truck  } from "lucide-react";
+import {Layers, Ruler, Store, Tag, Users, Building, ListChecks} from "lucide-react";
 
 const sidebarItems = [
   {id: "vendor", label: "Add Vendor", icon: Store},
-  {id: "shipment", label: "Shipment", icon: Truck},
+  {id: "customer", label: "Customers", icon: Users},
   {id: "BrandName", label: "Add Brand Name", icon: Tag},
   {id: "UnitType", label: "Add Unit Type", icon: Ruler},
   {id: "productType", label: "Add Product Type", icon: Layers},
+  {id: "attributes", label: "Attributes", icon: ListChecks},
+  {id: "storeSettings", label: "Store Settings", icon: Building},
 ];
 
 export default function SettingsSidebar({activeTab, onSelectTab}) {

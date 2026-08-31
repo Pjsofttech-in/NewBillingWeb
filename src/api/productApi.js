@@ -34,7 +34,27 @@ export const updateProductStock = async ({id, ...payload}) => {
   return response.data;
 };
 
-export const getStockHistory = async (productId) => {
-  const response = await API.get(`/api/products/${productId}/stock-history`);
+export const fetchProductsPaged = async ({
+  page = 0,
+  size = 10,
+  sortBy = "productName",
+  sortDir = "asc",
+} = {}) => {
+  const { data } = await API.get("/api/products/paged", {
+    params: { page, size, sortBy, sortDir },
+  });
+  return data;
+};
+
+export const getProductBatches = async (productId, activeOnly = false) => {
+  const endpoint = activeOnly
+    ? `/api/stock-batches/product/${productId}/active`
+    : `/api/stock-batches/product/${productId}`;
+  const response = await API.get(endpoint);
+  return response.data;
+};
+
+export const purchaseStockBatch = async (payload) => {
+  const response = await API.post("/api/stock-batches/purchase", payload);
   return response.data;
 };
