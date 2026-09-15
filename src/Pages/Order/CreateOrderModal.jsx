@@ -12,13 +12,13 @@ const DEFAULT_VALUES = {
   customerType: "existing",
   customerId: "",
   orderDate: new Date().toISOString().split("T")[0],
+  paymentDueDate: "",
   status: "PENDING",
   orderItems: [
     {
       productId: "",
       quantity: 1,
       customerDiscountPercentage: 0,
-      price: "",
     },
   ],
 };
@@ -118,18 +118,16 @@ const CreateOrderModal = ({
   };
 
   const formatOrderItems = (rawItems) => {
-  return rawItems.map((item) => ({
-    product: {
-      id: Number(item.productId),
-    },
+    return rawItems.map((item) => ({
+      product: {
+        id: Number(item.productId),
+      },
 
-    quantity: Number(item.quantity),
+      quantity: Number(item.quantity),
 
-    customerDiscountPercentage: Number(
-      item.customerDiscountPercentage || 0
-    ),
-  }));
-};
+      customerDiscountPercentage: Number(item.customerDiscountPercentage || 0),
+    }));
+  };
   const calculateOverallTotals = () => {
     let subtotal = 0;
     let totalDiscount = 0;
@@ -143,49 +141,27 @@ const CreateOrderModal = ({
 
       if (!product) return;
 
-      const quantity = Number(item.quantity || 1);
-
-      const basePrice = Number(product.customerPrice || product.price || 0);
-
-      const discountPercentage = Number(item.customerDiscountPercentage || 0);
-
-      const customPrice =
-        item.price !== "" && item.price !== undefined && item.price !== null
-          ? Number(item.price)
-          : null;
-
-      let finalUnitPrice = basePrice;
-
-      if (customPrice !== null && !Number.isNaN(customPrice)) {
-        finalUnitPrice = customPrice;
-      } else if (discountPercentage > 0) {
-        finalUnitPrice = basePrice - (basePrice * discountPercentage) / 100;
-      }
-
+      const quantity = Number(item.quantity || 0);
+      const basePrice = Number(product.customerPrice || 0);
+      const discountPercentage = Math.max(
+        0,
+        Math.min(100, Number(item.customerDiscountPercentage || 0)),
+      );
       const itemSubtotal = basePrice * quantity;
-
-      const itemDiscount = (basePrice - finalUnitPrice) * quantity;
-
+      const itemDiscount = (itemSubtotal * discountPercentage) / 100;
+      const taxable = Math.max(0, itemSubtotal - itemDiscount);
       const gstPercentage = product.gstApplicable
-        ? Number(product.totalGstPercentage || product.gstPercentage || 0)
+        ? Number(product.totalGstPercentage || 0)
         : 0;
-
-      const itemGst = (finalUnitPrice * quantity * gstPercentage) / 100;
-
-      const itemTotal = finalUnitPrice * quantity + itemGst;
+      const itemGst = (taxable * gstPercentage) / 100;
 
       subtotal += itemSubtotal;
       totalDiscount += itemDiscount;
       totalGst += itemGst;
-      grandTotal += itemTotal;
+      grandTotal += taxable + itemGst;
     });
 
-    return {
-      subtotal,
-      totalDiscount,
-      totalGst,
-      grandTotal,
-    };
+    return {subtotal, totalDiscount, totalGst, grandTotal};
   };
 
   const overallTotals = calculateOverallTotals();
@@ -202,8 +178,18 @@ const CreateOrderModal = ({
       return;
     }
 
+    if (
+      data.paymentDueDate &&
+      data.orderDate &&
+      data.paymentDueDate < data.orderDate
+    ) {
+      setErrorMessage("Payment due date cannot be before the order date");
+      return;
+    }
+
     const orderPayload = {
       orderDate: data.orderDate,
+      paymentDueDate: data.paymentDueDate || null,
       status: data.status,
       customer: {
         id: Number(data.customerId),
@@ -245,6 +231,7 @@ const CreateOrderModal = ({
 
     const orderPartialPayload = {
       orderDate: currentOrderData.orderDate,
+      paymentDueDate: currentOrderData.paymentDueDate || null,
       status: currentOrderData.status,
       orderItems: formatOrderItems(currentOrderData.orderItems),
     };
@@ -297,7 +284,7 @@ const CreateOrderModal = ({
             className="overflow-y-auto p-6 space-y-5"
           >
             {/* Customer and Date */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="md:col-span-2 space-y-3">
                 <Radio
                   label="Customer Type"
@@ -357,30 +344,48 @@ const CreateOrderModal = ({
                   required: "Order date is required",
                 }}
               />
+
+              <Input
+                label="Payment Due Date"
+                name="paymentDueDate"
+                type="date"
+                register={register}
+                error={errors.paymentDueDate}
+                rules={{
+                  validate: (value, formValues) =>
+                    !value ||
+                    !formValues.orderDate ||
+                    value >= formValues.orderDate ||
+                    "Due date cannot be before order date",
+                }}
+              />
             </div>
 
             {/* Order Items */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <h4 className="text-sm font-semibold text-slate-800">
-                  Order Items
-                </h4>
+                <div className="flex items-center gap-2">
+                  <h4 className="text-sm font-semibold text-slate-800">
+                    Order Items
+                  </h4>
 
-                <button
-                  type="button"
-                  onClick={() =>
-                    append({
-                      productId: "",
-                      quantity: 1,
-                      customerDiscountPercentage: 0,
-                      price: "",
-                    })
-                  }
-                  className="flex items-center gap-1 px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 cursor-pointer"
-                >
-                  <Plus className="w-4 h-4" />
-                  Add Item
-                </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      append({
+                        productId: "",
+                        quantity: 1,
+                        customerDiscountPercentage: 0,
+                        price: "",
+                      })
+                    }
+                    title="Add Item"
+                    aria-label="Add Item"
+                    className="flex h-6 w-6 cursor-pointer items-center justify-center rounded-md bg-blue-600 text-white transition hover:bg-blue-700"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
 
               {fields.map((field, index) => {
@@ -405,22 +410,6 @@ const CreateOrderModal = ({
                   watchedItems?.[index]?.customerDiscountPercentage || 0,
                 );
 
-                const enteredPrice = watchedItems?.[index]?.price;
-
-                let finalSellingPrice = storePrice;
-
-                if (
-                  enteredPrice !== "" &&
-                  enteredPrice !== undefined &&
-                  enteredPrice !== null &&
-                  !Number.isNaN(Number(enteredPrice))
-                ) {
-                  finalSellingPrice = Number(enteredPrice);
-                } else if (discountPercentage > 0) {
-                  finalSellingPrice =
-                    storePrice - (storePrice * discountPercentage) / 100;
-                }
-
                 const gstPercentage = selectedProduct?.gstApplicable
                   ? Number(
                       selectedProduct?.totalGstPercentage ||
@@ -429,11 +418,11 @@ const CreateOrderModal = ({
                     )
                   : 0;
 
-                const lineSubtotal = finalSellingPrice * quantity;
-
-                const lineGst = (lineSubtotal * gstPercentage) / 100;
-
-                const lineTotal = lineSubtotal + lineGst;
+                const lineSubtotal = storePrice * quantity;
+                const lineDiscount = (lineSubtotal * discountPercentage) / 100;
+                const taxableAmount = Math.max(0, lineSubtotal - lineDiscount);
+                const lineGst = (taxableAmount * gstPercentage) / 100;
+                const lineTotal = taxableAmount + lineGst;
 
                 return (
                   <div
@@ -446,7 +435,7 @@ const CreateOrderModal = ({
                   >
                     <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-start">
                       {/* Product */}
-                      <div className="md:col-span-5">
+                      <div className="md:col-span-6">
                         <Select
                           name={`orderItems.${index}.productId`}
                           register={register}
@@ -472,15 +461,6 @@ const CreateOrderModal = ({
                               );
 
                               if (product) {
-                                const productPrice = Number(
-                                  product.customerPrice || product.price || 0,
-                                );
-
-                                setValue(
-                                  `orderItems.${index}.price`,
-                                  productPrice ? String(productPrice) : "",
-                                );
-
                                 setValue(
                                   `orderItems.${index}.customerDiscountPercentage`,
                                   0,
@@ -524,7 +504,7 @@ const CreateOrderModal = ({
                       </div>
 
                       {/* Discount */}
-                      <div className="md:col-span-2">
+                      <div className="md:col-span-3">
                         <Input
                           name={`orderItems.${index}.customerDiscountPercentage`}
                           type="number"
@@ -543,64 +523,6 @@ const CreateOrderModal = ({
                             max: {
                               value: 100,
                               message: "Maximum discount is 100%",
-                            },
-
-                            onChange: (event) => {
-                              const discount = Number(event.target.value);
-
-                              if (
-                                !Number.isNaN(discount) &&
-                                discount >= 0 &&
-                                discount <= 100 &&
-                                storePrice > 0
-                              ) {
-                                const discountedPrice = (
-                                  storePrice -
-                                  (storePrice * discount) / 100
-                                ).toFixed(2);
-
-                                setValue(
-                                  `orderItems.${index}.price`,
-                                  discountedPrice,
-                                );
-                              }
-                            },
-                          }}
-                        />
-                      </div>
-
-                      {/* Price */}
-                      <div className="md:col-span-2">
-                        <Input
-                          name={`orderItems.${index}.price`}
-                          type="number"
-                          placeholder="Price"
-                          register={register}
-                          error={errors.orderItems?.[index]?.price}
-                          rules={{
-                            min: {
-                              value: 0,
-                              message: "Price cannot be negative",
-                            },
-
-                            onChange: (event) => {
-                              const price = Number(event.target.value);
-
-                              if (
-                                !Number.isNaN(price) &&
-                                storePrice > 0 &&
-                                price <= storePrice
-                              ) {
-                                const calculatedDiscount = (
-                                  ((storePrice - price) / storePrice) *
-                                  100
-                                ).toFixed(2);
-
-                                setValue(
-                                  `orderItems.${index}.customerDiscountPercentage`,
-                                  calculatedDiscount,
-                                );
-                              }
                             },
                           }}
                         />
@@ -627,6 +549,16 @@ const CreateOrderModal = ({
                           <Package className="w-3.5 h-3.5" />
 
                           <span>Available Stock: {availableStock}</span>
+                          <span>•</span>
+                          <span>
+                            MRP: ₹
+                            {Number(selectedProduct?.productMrp || 0).toFixed(
+                              2,
+                            )}
+                          </span>
+                          <span>•</span>
+
+                          <span>Sell: ₹{storePrice.toFixed(2)}</span>
 
                           {gstPercentage > 0 && (
                             <>
@@ -769,7 +701,7 @@ const CreateOrderModal = ({
       <CustomerModal
         isOpen={isNewCustomerModalOpen}
         onClose={() => setIsNewCustomerModalOpen(false)}
-        onSubmit={handleNewCustomerCreate}
+        onSubmit={handleNewCustomerCreate} 
         isSubmitting={isSubmitting}
       />
     </>

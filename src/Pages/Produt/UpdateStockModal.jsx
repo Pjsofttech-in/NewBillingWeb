@@ -20,6 +20,7 @@ const UpdateStockModal = ({
   const [selectedVendorId, setSelectedVendorId] = useState("");
   const [mrp, setMrp] = useState("");
   const [vendorDiscountPercentage, setVendorDiscountPercentage] = useState("");
+  const [productMrp, setProductMrp] = useState("");
   // customerPrice is the ONLY manually-typed price. Store/purchase price is
   // always derived from MRP - discount%, never typed directly, so it can
   // never drift out of sync with what the vendor actually charged.
@@ -54,6 +55,7 @@ const UpdateStockModal = ({
       setMrp(p.mrp ?? "");
       setVendorDiscountPercentage(p.vendorDiscountPercentage ?? "");
       setCustomerPrice(p.customerPrice ?? "");
+      setProductMrp(p.productMrp ?? "");
     }
     setReceivedDate(new Date().toISOString().slice(0, 10));
   }, [isOpen, product]);
@@ -90,6 +92,7 @@ const UpdateStockModal = ({
     setSelectedProductId("");
     setAddedQuantity("");
     setBatchNumber("");
+    setProductMrp("");
     setAmountPaidNow("0");
     setTransactionRef("");
     setRemarks("");
@@ -129,6 +132,8 @@ const UpdateStockModal = ({
     if (!selectedVendorId)
       return setError("Please select the vendor for this stock batch");
     if (Number(mrp) <= 0) return setError("Vendor MRP is required");
+    if (Number(productMrp) < 0)
+      return setError("Actual product MRP cannot be negative");
     if (Number(customerPrice) < 0)
       return setError("Customer price cannot be negative");
     if ((Number(amountPaidNow) || 0) > totalBill)
@@ -145,6 +150,7 @@ const UpdateStockModal = ({
       mrp: Number(mrp),
       vendorDiscountPercentage: Number(vendorDiscountPercentage) || 0,
       storePrice: storePrice,
+      productMrp: productMrp === "" ? Number(activeProduct?.productMrp || 0) : Number(productMrp),
       customerPrice: customerPrice === "" ? storePrice : Number(customerPrice),
       batchNumber: batchNumber.trim() || null,
       receivedDate: receivedDate || null,
@@ -221,6 +227,12 @@ const UpdateStockModal = ({
               </div>
               <div>
                 <span className="text-[10px] text-slate-500 block">
+                  CURRENT PRODUCT MRP
+                </span>
+                <b>{money(activeProduct.productMrp)}</b>
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-500 block">
                   CURRENT SELL PRICE
                 </span>
                 <b>{money(activeProduct.customerPrice)}</b>
@@ -276,7 +288,15 @@ const UpdateStockModal = ({
               </span>
             </label>
 
-            {/* The one price you actually decide. This IS the Batch Selling Price. */}
+            <Field
+              label="Actual Product MRP *"
+              type="number"
+              min="0"
+              step="0.01"
+              value={productMrp}
+              onChange={setProductMrp}
+            />
+
             <Field
               label="New Customer / Selling Price *"
               type="number"

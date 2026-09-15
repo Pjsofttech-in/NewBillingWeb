@@ -55,6 +55,7 @@ const OrderPage = () => {
     mutationFn: createOrder,
     onSuccess: () => {
       queryClient.invalidateQueries({queryKey: ["orders"]});
+      queryClient.invalidateQueries({queryKey: ["orders-gst-summary"]});
       queryClient.invalidateQueries({queryKey: ["customers"]});
       queryClient.invalidateQueries({queryKey: ["products"]});
       setIsModalOpen(false);
@@ -67,6 +68,7 @@ const OrderPage = () => {
     mutationFn: deleteOrder,
     onSuccess: () => {
       queryClient.invalidateQueries({queryKey: ["orders"]});
+      queryClient.invalidateQueries({queryKey: ["orders-gst-summary"]});
       queryClient.invalidateQueries({queryKey: ["products"]});
       showToast("Order deleted successfully", "success");
     },
@@ -95,6 +97,7 @@ const OrderPage = () => {
 
   const handleSuccessRefresh = () => {
     queryClient.invalidateQueries({queryKey: ["orders"]});
+    queryClient.invalidateQueries({queryKey: ["orders-gst-summary"]});
     queryClient.invalidateQueries({queryKey: ["products"]});
   };
 

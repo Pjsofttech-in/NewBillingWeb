@@ -55,6 +55,7 @@ const BatchListModal = ({isOpen, product, onClose}) => {
                   <th className="p-3">Vendor MRP</th>
                   <th className="p-3">Vendor Disc.</th>
                   <th className="p-3">Buy Price</th>
+                  <th className="p-3">Product MRP</th>
                   <th className="p-3">Customer Price</th>
                 </tr>
               </thead>
@@ -76,6 +77,9 @@ const BatchListModal = ({isOpen, product, onClose}) => {
                     </td>
                     <td className="p-3 text-right font-bold text-blue-700">
                       ₹{Number(b.purchasePrice || 0).toFixed(2)}
+                    </td>
+                    <td className="p-3 text-right font-bold text-slate-700">
+                      ₹{Number(b.productMrp || 0).toFixed(2)}
                     </td>
                     <td className="p-3 text-right font-bold text-emerald-700">
                       ₹{Number(b.sellingPrice || 0).toFixed(2)}

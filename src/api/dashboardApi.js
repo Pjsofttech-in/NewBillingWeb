@@ -5,3 +5,4 @@ export const fetchLowStockAlerts=async(threshold=5)=>(await API.get("/dashboard/
 export const fetchDailyRevenue=async(days=7)=>(await API.get("/dashboard/daily-revenue",{params:{days}})).data;
 export const fetchOrderWiseRevenue=async(limit=10)=>(await API.get("/dashboard/order-wise-revenue",{params:{limit}})).data;
 export const fetchPaymentStatusRevenue=async()=> (await API.get("/dashboard/payment-status-revenue")).data;
+export const fetchAnalytics=async(range="7D")=>(await API.get("/dashboard/analytics",{params:{range}})).data;

@@ -31,7 +31,7 @@ import {
   fetchDashboardSummary,
   fetchTopSellingProducts,
   fetchLowStockAlerts,
-  fetchDailyRevenue,
+  fetchAnalytics,
   fetchOrderWiseRevenue,
   fetchPaymentStatusRevenue,
 } from "../../api/dashboardApi";
@@ -105,16 +105,65 @@ const RevenueTooltip = ({active, payload, label}) => {
   );
 };
 
-const ChartCard = ({title, children}) => (
+const AnalyticsTooltip = ({active, payload, label, isRevenueMetric}) => {
+  if (!active || !payload || !payload.length) {
+    return null;
+  }
+
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-lg">
+      <p className="mb-1 text-xs font-semibold text-slate-600">{label}</p>
+
+      {payload.map((item) => (
+        <p
+          key={item.dataKey}
+          className="text-sm font-semibold text-slate-800"
+        >
+          {item.name}:{" "}
+          {isRevenueMetric ? money(item.value) : `${item.value} units`}
+        </p>
+      ))}
+    </div>
+  );
+};
+
+const ChartCard = ({title, actions, children}) => (
   <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-    <h2 className="mb-5 text-sm font-bold text-slate-800">{title}</h2>
+    <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <h2 className="text-sm font-bold text-slate-800">{title}</h2>
+
+      {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
+    </div>
 
     <div className="h-[320px] w-full">{children}</div>
   </div>
 );
 
+// Small pill-style toggle button used for Revenue/Sell and 1D/7D/1M/1Y controls
+const ToggleButton = ({active, onClick, children}) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+      active
+        ? "bg-[#0073b7] text-white shadow-sm"
+        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+    }`}
+  >
+    {children}
+  </button>
+);
+
+const RANGE_OPTIONS = [
+  {value: "1D", label: "1D"},
+  {value: "7D", label: "7D"},
+  {value: "1M", label: "1M"},
+  {value: "1Y", label: "1Y"},
+];
+
 export default function Dashboard() {
-  const [days, setDays] = useState(7);
+  const [range, setRange] = useState("7D");
+  const [metric, setMetric] = useState("revenue"); // "revenue" | "sell"
 
   const lowStockThreshold = 5;
 
@@ -146,12 +195,12 @@ export default function Dashboard() {
   });
 
   // =========================
-  // DAILY REVENUE
+  // REVENUE / SELL ANALYTICS
   // =========================
 
-  const {data: daily = [], isLoading: dailyLoading} = useQuery({
-    queryKey: ["dashboard", "daily-revenue", days],
-    queryFn: () => fetchDailyRevenue(days),
+  const {data: analytics = [], isLoading: analyticsLoading} = useQuery({
+    queryKey: ["dashboard", "analytics", range],
+    queryFn: () => fetchAnalytics(range),
   });
 
   // =========================
@@ -174,14 +223,18 @@ export default function Dashboard() {
     });
 
   // =========================
-  // NORMALIZE DAILY DATA
+  // NORMALIZE ANALYTICS DATA (Revenue + Sell)
   // =========================
 
-  const dailyChartData = daily.map((item) => ({
+  const analyticsChartData = analytics.map((item) => ({
     label: item.label || item.date || item.orderDate || "Unknown",
 
-    amount: Number(item.amount ?? item.revenue ?? item.totalAmount ?? 0),
+    revenue: Number(item.revenue ?? item.amount ?? item.totalAmount ?? 0),
+
+    unitsSold: Number(item.unitsSold ?? item.quantity ?? item.sell ?? 0),
   }));
+
+  const isRevenueMetric = metric === "revenue";
 
   // =========================
   // NORMALIZE ORDER DATA
@@ -293,47 +346,56 @@ export default function Dashboard() {
       </div>
 
       {/* =========================
-          REVENUE FILTER
-      ========================= */}
-
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-base font-bold text-slate-800">
-            Revenue Analytics
-          </h2>
-
-          <p className="text-xs text-slate-500">
-            View revenue performance by time period.
-          </p>
-        </div>
-
-        <select
-          value={days}
-          onChange={(e) => setDays(Number(e.target.value))}
-          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-[#0073b7] sm:w-auto"
-        >
-          <option value={7}>Last 7 Days</option>
-          <option value={30}>Last 30 Days</option>
-          <option value={365}>Last 1 Year</option>
-        </select>
-      </div>
-
-      {/* =========================
-          DAY WISE REVENUE
+          REVENUE / SELL ANALYTICS
           ORDER WISE REVENUE
       ========================= */}
 
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-        {/* DAY WISE REVENUE */}
+        {/* REVENUE / SELL ANALYTICS */}
 
-        <ChartCard title="Day-wise Revenue">
-          {dailyLoading ? (
+        <ChartCard
+          title="Revenue & Sell Analytics"
+          actions={
+            <>
+              {/* Revenue / Sell toggle */}
+              <div className="flex items-center gap-1 rounded-lg bg-slate-50 p-1">
+                <ToggleButton
+                  active={metric === "revenue"}
+                  onClick={() => setMetric("revenue")}
+                >
+                  Revenue
+                </ToggleButton>
+
+                <ToggleButton
+                  active={metric === "sell"}
+                  onClick={() => setMetric("sell")}
+                >
+                  Sell
+                </ToggleButton>
+              </div>
+
+              {/* Time range selector: 1D / 7D / 1M / 1Y */}
+              <div className="flex items-center gap-1 rounded-lg bg-slate-50 p-1">
+                {RANGE_OPTIONS.map((opt) => (
+                  <ToggleButton
+                    key={opt.value}
+                    active={range === opt.value}
+                    onClick={() => setRange(opt.value)}
+                  >
+                    {opt.label}
+                  </ToggleButton>
+                ))}
+              </div>
+            </>
+          }
+        >
+          {analyticsLoading ? (
             <div className="flex h-full items-center justify-center text-sm text-slate-400">
               Loading chart...
             </div>
-          ) : dailyChartData.length === 0 ? (
+          ) : analyticsChartData.length === 0 ? (
             <div className="flex h-full items-center justify-center text-sm text-slate-400">
-              No revenue data available.
+              No {isRevenueMetric ? "revenue" : "sell"} data available.
             </div>
           ) : (
             <ResponsiveContainer
@@ -341,7 +403,7 @@ export default function Dashboard() {
               height="100%"
             >
               <BarChart
-                data={dailyChartData}
+                data={analyticsChartData}
                 margin={{
                   top: 10,
                   right: 10,
@@ -362,20 +424,34 @@ export default function Dashboard() {
                 />
 
                 <YAxis
-                  tickFormatter={shortMoney}
+                  tickFormatter={isRevenueMetric ? shortMoney : undefined}
+                  allowDecimals={!isRevenueMetric ? false : undefined}
                   tick={{
                     fontSize: 11,
                   }}
                 />
 
-                <Tooltip content={<RevenueTooltip />} />
-
-                <Bar
-                  dataKey="amount"
-                  name="Revenue"
-                  fill="#0073b7"
-                  radius={[6, 6, 0, 0]}
+                <Tooltip
+                  content={
+                    <AnalyticsTooltip isRevenueMetric={isRevenueMetric} />
+                  }
                 />
+
+                {isRevenueMetric ? (
+                  <Bar
+                    dataKey="revenue"
+                    name="Revenue"
+                    fill="#0073b7"
+                    radius={[6, 6, 0, 0]}
+                  />
+                ) : (
+                  <Bar
+                    dataKey="unitsSold"
+                    name="Units Sold"
+                    fill="#16a34a"
+                    radius={[6, 6, 0, 0]}
+                  />
+                )}
               </BarChart>
             </ResponsiveContainer>
           )}

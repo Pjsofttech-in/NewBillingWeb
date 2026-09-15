@@ -6,7 +6,6 @@ import DeleteConfirmModal from "../../Components/DeleteConfirmModal";
 import UpdateStockModal from "./UpdateStockModal";
 import ProductDetailsModal from "./ProductDetailsModal";
 import BatchListModal from "./BatchListModal";
-import VendorBillModal from "./VendorBillModal";
 import Pagination from "../../Components/Pagination";
 import {usePagination} from "../../hooks/usePagination";
 
@@ -17,7 +16,6 @@ const ProductList = ({products = []}) => {
   const [productToUpdateStock, setProductToUpdateStock] = useState(null);
   const [productForDetails, setProductForDetails] = useState(null);
   const [productForBatches, setProductForBatches] = useState(null);
-  const [showVendorBills, setShowVendorBills] = useState(false);
 
   const pagination = usePagination(products, 10);
 
@@ -48,9 +46,6 @@ const ProductList = ({products = []}) => {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
-        <button onClick={() => setShowVendorBills(true)} className="px-3 py-2 text-xs font-bold rounded-lg bg-slate-900 text-white hover:bg-slate-800">Vendor Bills</button>
-      </div>
       {toast && (
         <Toast
           message={toast.message}
@@ -86,11 +81,6 @@ const ProductList = ({products = []}) => {
         isOpen={Boolean(productForBatches)}
         product={productForBatches}
         onClose={() => setProductForBatches(null)}
-      />
-
-      <VendorBillModal
-        isOpen={showVendorBills}
-        onClose={() => setShowVendorBills(false)}
       />
 
       {/* MOBILE CARD VIEW */}
@@ -169,6 +159,12 @@ const ProductList = ({products = []}) => {
                   </span>
                 </div>
                 <div className="flex justify-between text-gray-700">
+                  <span className="font-medium">Product MRP:</span>
+                  <span className="font-bold text-slate-700 text-sm">
+                    ₹{Number(item.productMrp || 0).toLocaleString()}
+                  </span>
+                </div>
+                <div className="flex justify-between text-gray-700">
                   <span className="font-medium">Sell Price:</span>
                   <span className="font-bold text-emerald-600 text-sm">
                     ₹{customerPrice.toLocaleString()}
@@ -205,12 +201,13 @@ const ProductList = ({products = []}) => {
       {/* DESKTOP TABLE VIEW */}
       <div className="hidden lg:block bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
         <table className="w-full text-left text-sm text-gray-700">
-          <thead className="bg-gray-50 border-b border-gray-200 text-gray-800 uppercase text-xs tracking-wider font-bold">
+          <thead className="bg-gray-50 border-b border-gray-200 text-gray-800  uppercase text-xs tracking-wider font-bold">
             <tr>
               <th className="px-3 py-3">ID</th>
               <th className="px-3 py-3">Product</th>
               <th className="px-3 py-3">Buy Price</th>
-              <th className="px-3 py-3">Store Price</th>
+              <th className="px-3 py-3">Product MRP</th>
+              <th className="px-3 py-3">Sell Price</th>
               <th className="px-3 py-3">GST</th>
               <th className="px-3 py-3">Stock</th>
               <th className="px-3 py-3">Vendor</th>
@@ -266,6 +263,13 @@ const ProductList = ({products = []}) => {
                       </span>
                       )
                     </div>
+                  </td>
+
+                  <td className="px-3 py-3">
+                    <div className="font-bold text-gray-900 text-sm">
+                      ₹{Number(item.productMrp || 0).toLocaleString()}
+                    </div>
+                    <div className="text-xs text-gray-500 mt-0.5">Actual printed MRP</div>
                   </td>
 
                   <td className="px-3 py-3">

@@ -1,20 +1,63 @@
-import { useEffect, useState, useCallback } from "react";
-import { useForm, useWatch } from "react-hook-form";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createProduct, purchaseStockBatch } from "../../api/productApi";
-import { fetchAttributesByProductType } from "../../api/attributeApi";
-import { createProductAttributeValue } from "../../api/productAttributeValueApi";
-
-import { fetchBrands } from "../../api/brandServiceApi";
-import { fetchVendors } from "../../api/vendorServiceApi";
-import { fetchUnitTypes } from "../../api/unitTypeServiceApi";
-import { fetchProductTypes } from "../../api/productTypeServiceApi";
-
+import {useCallback, useEffect, useMemo, useState} from "react";
+import {useForm, useWatch} from "react-hook-form";
+import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
+import {createProduct, updateProductStock} from "../../api/productApi";
+import {fetchAttributesByProductType} from "../../api/attributeApi";
+import {createProductAttributeValue} from "../../api/productAttributeValueApi";
+import {fetchBrands} from "../../api/brandServiceApi";
+import {fetchVendors} from "../../api/vendorServiceApi";
+import {fetchUnitTypes} from "../../api/unitTypeServiceApi";
+import {fetchProductTypes} from "../../api/productTypeServiceApi";
 import Input from "../../Components/Form/Input";
 import Select from "../../Components/Form/Select";
 import Checkbox from "../../Components/Form/Checkbox";
 
-const ProductModal = ({ isOpen, onClose, onSuccess }) => {
+const DEFAULT_VALUES = {
+  productName: "",
+  productTypeId: "",
+  brandId: "",
+  vendorId: "",
+  unitTypeId: "",
+  stock: "0",
+  mrp: "0",
+  vendorDiscountPercentage: "0",
+  productMrp: "0",
+  customerPrice: "0",
+  gstApplicable: false,
+  applyCgst: false,
+  applySgst: false,
+  applyUgst: false,
+  applyIgst: false,
+  cgstPercentage: "0",
+  sgstPercentage: "0",
+  ugstPercentage: "0",
+  igstPercentage: "0",
+  receivedDate: new Date().toISOString().slice(0, 10),
+  dueDate: "",
+  amountPaidNow: "0",
+  paymentMethod: "CASH",
+  transactionRef: "",
+};
+
+const money = (value) =>
+  `₹${Number(value || 0).toLocaleString("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+
+const safeFloat = (value) => {
+  const number = Number.parseFloat(value);
+  return Number.isFinite(number) ? number : 0;
+};
+
+const safeInt = (value) => {
+  const number = Number.parseInt(value, 10);
+  return Number.isFinite(number) ? number : 0;
+};
+
+const clampPercent = (value) => Math.max(0, Math.min(100, safeFloat(value)));
+
+export default function ProductModal({isOpen, onClose, onSuccess}) {
   const queryClient = useQueryClient();
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -24,34 +67,33 @@ const ProductModal = ({ isOpen, onClose, onSuccess }) => {
     reset,
     setValue,
     control,
-    formState: { errors },
-  } = useForm({
-    defaultValues: {
-      productName: "",
-      productTypeId: "",
-      brandId: "",
-      vendorId: "",
-      unitTypeId: "",
-      stock: "0",
-      mrp: "0",
-      vendorDiscountPercentage: "0",
-      customerPrice: "0",
-      gstApplicable: false,
-      applyCgst: false,
-      applySgst: false,
-      applyUgst: false,
-      applyIgst: false,
-      cgstPercentage: "0",
-      sgstPercentage: "0",
-      ugstPercentage: "0",
-      igstPercentage: "0",
-    },
+    formState: {errors},
+  } = useForm({defaultValues: DEFAULT_VALUES});
+
+  const isGstApplicable = useWatch({control, name: "gstApplicable"});
+  const selectedProductTypeId = useWatch({control, name: "productTypeId"});
+  const watchedMrp = useWatch({control, name: "mrp"});
+  const watchedVendorDiscount = useWatch({
+    control,
+    name: "vendorDiscountPercentage",
   });
+  const watchedStock = useWatch({control, name: "stock"});
+  const watchedPaid = useWatch({control, name: "amountPaidNow"});
+  const watchedCustomerPrice = useWatch({control, name: "customerPrice"});
 
-  const isGstApplicable = useWatch({ control, name: "gstApplicable" });
-  const selectedProductTypeId = useWatch({ control, name: "productTypeId" });
+  const purchasePrice = useMemo(() => {
+    const mrp = safeFloat(watchedMrp);
+    const discount = clampPercent(watchedVendorDiscount);
+    return Math.max(0, Number((mrp - (mrp * discount) / 100).toFixed(2)));
+  }, [watchedMrp, watchedVendorDiscount]);
 
-  // Reset tax values when GST is untagged
+  const totalBill = useMemo(
+    () => purchasePrice * Math.max(0, safeInt(watchedStock)),
+    [purchasePrice, watchedStock],
+  );
+
+  const dueAmount = Math.max(0, totalBill - Math.max(0, safeFloat(watchedPaid)));
+
   useEffect(() => {
     if (!isGstApplicable) {
       setValue("applyCgst", false);
@@ -65,109 +107,128 @@ const ProductModal = ({ isOpen, onClose, onSuccess }) => {
     }
   }, [isGstApplicable, setValue]);
 
-  // Close on Escape key press
   const handleKeyDown = useCallback(
-    (e) => {
-      if (e.key === "Escape") {
+    (event) => {
+      if (event.key === "Escape") {
         setErrorMessage("");
         onClose();
       }
     },
-    [onClose]
+    [onClose],
   );
 
   useEffect(() => {
-    if (isOpen) {
-      window.addEventListener("keydown", handleKeyDown);
-    }
+    if (!isOpen) return undefined;
+    window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, handleKeyDown]);
 
-  // Data Queries
-  const { data: productTypes = [], isLoading: loadingTypes } = useQuery({
+  const {data: productTypes = [], isLoading: loadingTypes} = useQuery({
     queryKey: ["productTypes"],
     queryFn: fetchProductTypes,
     enabled: isOpen,
   });
-
-  const { data: brands = [], isLoading: loadingBrands } = useQuery({
+  const {data: brands = [], isLoading: loadingBrands} = useQuery({
     queryKey: ["brands"],
     queryFn: fetchBrands,
     enabled: isOpen,
   });
-
-  const { data: vendors = [], isLoading: loadingVendors } = useQuery({
+  const {data: vendors = [], isLoading: loadingVendors} = useQuery({
     queryKey: ["vendors"],
     queryFn: fetchVendors,
     enabled: isOpen,
   });
-
-  const { data: unitTypes = [], isLoading: loadingUnits } = useQuery({
+  const {data: unitTypes = [], isLoading: loadingUnits} = useQuery({
     queryKey: ["unitTypes"],
     queryFn: fetchUnitTypes,
     enabled: isOpen,
   });
-
-  const { data: attributes = [], isLoading: loadingAttributes } = useQuery({
+  const {data: attributes = [], isLoading: loadingAttributes} = useQuery({
     queryKey: ["attributes", selectedProductTypeId],
     queryFn: () => fetchAttributesByProductType(selectedProductTypeId),
     enabled: Boolean(isOpen && selectedProductTypeId),
   });
 
   const createMutation = useMutation({
-    mutationFn: async ({ productPayload, stockPayload, attributeValues }) => {
+    mutationFn: async ({productPayload, stockPayload, attributeValues}) => {
       const product = await createProduct(productPayload);
-      if (stockPayload.quantity > 0) await purchaseStockBatch({ ...stockPayload, productId: product.id });
+
+      if (stockPayload.addedQuantity > 0) {
+        await updateProductStock({
+          id: product.id,
+          ...stockPayload,
+        });
+      }
+
       await Promise.all(
-        (attributeValues || [])
+        attributeValues
           .filter((item) => String(item.value ?? "").trim() !== "")
           .map((item) =>
             createProductAttributeValue({
-              product: { id: product.id },
-              attribute: { id: Number(item.attributeId) },
-              value: String(item.value),
-            })
-          )
+              product: {id: product.id},
+              attribute: {id: Number(item.attributeId)},
+              value: String(item.value).trim(),
+            }),
+          ),
       );
+
       return product;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["products"] });
-      reset();
+      queryClient.invalidateQueries({queryKey: ["products"]});
+      queryClient.invalidateQueries({queryKey: ["productBatches"]});
+      queryClient.invalidateQueries({queryKey: ["vendorBills"]});
+      reset({...DEFAULT_VALUES, receivedDate: new Date().toISOString().slice(0, 10)});
       setErrorMessage("");
-      if (onSuccess) onSuccess();
+      onSuccess?.();
       onClose();
     },
-    onError: (err) => {
-      const msg =
-        err.response?.data?.message ||
-        err.message ||
-        "Failed to create product. Please review details and try again.";
-      setErrorMessage(msg);
+    onError: (error) => {
+      setErrorMessage(
+        error?.response?.data?.message ||
+          error?.message ||
+          "Failed to create product.",
+      );
     },
   });
-
-  if (!isOpen) return null;
-
-  const safeFloat = (val) => {
-    const parsed = parseFloat(val);
-    return isNaN(parsed) ? 0 : parsed;
-  };
-
-  const safeInt = (val) => {
-    const parsed = parseInt(val, 10);
-    return isNaN(parsed) ? 0 : parsed;
-  };
 
   const onSubmit = (data) => {
     setErrorMessage("");
 
-    const payload = {
-      productName: data.productName,
-      mrp: safeFloat(data.mrp),
-      vendorDiscountPercentage: safeFloat(data.vendorDiscountPercentage),
-      customerPrice: safeFloat(data.customerPrice),
+    const quantity = safeInt(data.stock);
+    const amountPaidNow = Math.max(0, safeFloat(data.amountPaidNow));
+    const vendorMrp = Math.max(0, safeFloat(data.mrp));
+    const vendorDiscount = clampPercent(data.vendorDiscountPercentage);
+    const actualProductMrp = Math.max(0, safeFloat(data.productMrp));
+    const customerPrice = Math.max(0, safeFloat(data.customerPrice));
 
+    if (!data.productName?.trim()) {
+      setErrorMessage("Product name is required.");
+      return;
+    }
+    if (!data.vendorId) {
+      setErrorMessage("Vendor is required.");
+      return;
+    }
+    if (vendorMrp <= 0) {
+      setErrorMessage("Vendor MRP must be greater than 0.");
+      return;
+    }
+    if (actualProductMrp < 0 || customerPrice < 0) {
+      setErrorMessage("Product MRP and selling price cannot be negative.");
+      return;
+    }
+    if (amountPaidNow > totalBill + 0.009) {
+      setErrorMessage("Amount paid now cannot exceed the vendor bill amount.");
+      return;
+    }
+
+    const productPayload = {
+      productName: data.productName.trim(),
+      mrp: vendorMrp,
+      vendorDiscountPercentage: vendorDiscount,
+      customerPrice,
+      productMrp: actualProductMrp,
       stock: 0,
       gstApplicable: Boolean(data.gstApplicable),
       applyCgst: Boolean(data.applyCgst),
@@ -178,10 +239,26 @@ const ProductModal = ({ isOpen, onClose, onSuccess }) => {
       ugstPercentage: data.applyUgst ? safeFloat(data.ugstPercentage) : 0,
       applyIgst: Boolean(data.applyIgst),
       igstPercentage: data.applyIgst ? safeFloat(data.igstPercentage) : 0,
-      productType: { id: safeInt(data.productTypeId) },
-      brand: { id: safeInt(data.brandId) },
-      vendor: { id: safeInt(data.vendorId) },
-      unitType: { id: safeInt(data.unitTypeId) },
+      productType: {id: safeInt(data.productTypeId)},
+      brand: {id: safeInt(data.brandId)},
+      vendor: {id: safeInt(data.vendorId)},
+      unitType: {id: safeInt(data.unitTypeId)},
+    };
+
+    const stockPayload = {
+      vendorId: safeInt(data.vendorId),
+      batchNumber: data.batchNumber?.trim() || undefined,
+      vendorMrp,
+      vendorDiscountPercentage: vendorDiscount,
+      purchasePrice,
+      productMrp: actualProductMrp,
+      sellingPrice: customerPrice,
+      addedQuantity: quantity,
+      receivedDate: data.receivedDate || null,
+      dueDate: data.dueDate || null,
+      amountPaidNow,
+      paymentMethod: amountPaidNow > 0 ? data.paymentMethod : null,
+      transactionRef: amountPaidNow > 0 ? data.transactionRef?.trim() || null : null,
     };
 
     const attributeValues = Array.isArray(attributes)
@@ -191,291 +268,305 @@ const ProductModal = ({ isOpen, onClose, onSuccess }) => {
         }))
       : [];
 
-    const vendorMrp = safeFloat(data.mrp);
-    const vendorDiscount = safeFloat(data.vendorDiscountPercentage);
-    const purchasePrice = Math.max(0, vendorMrp - (vendorMrp * Math.max(0, Math.min(100, vendorDiscount))) / 100);
-    const customerPrice = safeFloat(data.customerPrice);
-    const stockPayload = {
-      vendorId: safeInt(data.vendorId),
-      quantity: safeInt(data.stock),
-      vendorMrp,
-      vendorDiscountPercentage: vendorDiscount,
-      purchasePrice,
-      sellingPrice: customerPrice,
-      amountPaidNow: 0,
-    };
-    createMutation.mutate({ productPayload: payload, stockPayload, attributeValues });
+    createMutation.mutate({productPayload, stockPayload, attributeValues});
   };
 
-  const typeOptions = Array.isArray(productTypes)
-    ? productTypes.map((t) => ({ label: t.typeName || t.name, value: t.id }))
-    : [];
-  const brandOptions = Array.isArray(brands)
-    ? brands.map((b) => ({ label: b.brandName || b.name, value: b.id }))
-    : [];
-  const vendorOptions = Array.isArray(vendors)
-    ? vendors.map((v) => ({ label: v.vendorName || v.name, value: v.id }))
-    : [];
-  const unitOptions = Array.isArray(unitTypes)
-    ? unitTypes.map((u) => ({
-        label: u.unitType || u.unitName || u.name,
-        value: u.id,
-      }))
-    : [];
+  const typeOptions = productTypes.map((item) => ({
+    label: item.typeName || item.name,
+    value: item.id,
+  }));
+  const brandOptions = brands.map((item) => ({
+    label: item.brandName || item.name,
+    value: item.id,
+  }));
+  const vendorOptions = vendors.map((item) => ({
+    label: item.vendorName || item.name,
+    value: item.id,
+  }));
+  const unitOptions = unitTypes.map((item) => ({
+    label: item.unitType || item.unitName || item.name,
+    value: item.id,
+  }));
+
+  if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
-      {/* Container with dynamic height limits */}
-      <div className="bg-white rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden border border-slate-100">
-        
-        {/* Header */}
-        <div className="flex justify-between items-center px-6 py-4 bg-slate-900 text-white shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-indigo-500/20 rounded-lg border border-indigo-400/30">
-              <svg className="w-5 h-5 text-indigo-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-              </svg>
-            </div>
-            <div>
-              <h2 className="text-base font-semibold text-white">Add New Product</h2>
-              <p className="text-xs text-slate-400">Fill in inventory details, pricing, and specific attributes</p>
-            </div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
+      <div className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+        <div className="flex shrink-0 items-center justify-between border-b bg-slate-900 px-5 py-4 text-white">
+          <div>
+            <h2 className="text-base font-bold">Add Product</h2>
+            <p className="mt-0.5 text-xs text-slate-400">
+              Product details, first stock batch, vendor bill and GST.
+            </p>
           </div>
           <button
             type="button"
-            onClick={() => {
-              setErrorMessage("");
-              onClose();
-            }}
-            className="text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg p-1.5 transition cursor-pointer"
-            aria-label="Close Modal"
+            onClick={onClose}
+            className="rounded-lg p-2 text-slate-300 transition hover:bg-slate-800 hover:text-white"
+            aria-label="Close"
           >
             ✕
           </button>
         </div>
 
-        {/* Scrollable Form Body */}
-        <div className="p-6 bg-slate-50/60 flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto bg-slate-50 p-5">
           {errorMessage && (
-            <div className="mb-4 p-3.5 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs flex items-center gap-2">
-              <svg className="w-4 h-4 shrink-0 text-red-500" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-              </svg>
-              <span>{errorMessage}</span>
+            <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {errorMessage}
             </div>
           )}
 
-          <form id="product-form" onSubmit={handleSubmit(onSubmit)} className="space-y-5 text-xs">
-            
-            {/* Section 1: Basic Information */}
-            <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm space-y-3">
-              <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
-                <span className="h-2 w-2 rounded-full bg-indigo-600"></span>
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">General Information</h3>
-              </div>
-
-              <div className="space-y-3">
+          <form id="product-form" onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <h3 className="mb-3 border-b border-slate-100 pb-2 text-sm font-bold text-slate-800">
+                Product Information
+              </h3>
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 <Input
                   label="Product Name"
                   name="productName"
-                  placeholder="e.g. Dell UltraSharp 27 Monitor"
+                  placeholder="Enter product name"
                   register={register}
-                  rules={{ required: "Product name is required" }}
+                  rules={{required: "Product name is required"}}
                   error={errors.productName}
                   required
                 />
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <Select
-                    label="Product Type"
-                    name="productTypeId"
-                    register={register}
-                    rules={{ required: "Product type is required" }}
-                    error={errors.productTypeId}
-                    required
-                    placeholder={loadingTypes ? "Loading..." : "Select Product Type"}
-                    options={typeOptions}
-                    disabled={loadingTypes}
-                  />
-                  <Select
-                    label="Brand"
-                    name="brandId"
-                    register={register}
-                    rules={{ required: "Brand is required" }}
-                    error={errors.brandId}
-                    required
-                    placeholder={loadingBrands ? "Loading..." : "Select Brand"}
-                    options={brandOptions}
-                    disabled={loadingBrands}
-                  />
-                  <Select
-                    label="Vendor"
-                    name="vendorId"
-                    register={register}
-                    rules={{ required: "Vendor is required" }}
-                    error={errors.vendorId}
-                    required
-                    placeholder={loadingVendors ? "Loading..." : "Select Vendor"}
-                    options={vendorOptions}
-                    disabled={loadingVendors}
-                  />
-                  <Select
-                    label="Unit Type"
-                    name="unitTypeId"
-                    register={register}
-                    rules={{ required: "Unit type is required" }}
-                    error={errors.unitTypeId}
-                    required
-                    placeholder={loadingUnits ? "Loading..." : "Select Unit Type"}
-                    options={unitOptions}
-                    disabled={loadingUnits}
-                  />
-                </div>
+                <Select
+                  label="Product Type"
+                  name="productTypeId"
+                  register={register}
+                  rules={{required: "Product type is required"}}
+                  error={errors.productTypeId}
+                  required
+                  placeholder={loadingTypes ? "Loading..." : "Select product type"}
+                  options={typeOptions}
+                  disabled={loadingTypes}
+                />
+                <Select
+                  label="Brand"
+                  name="brandId"
+                  register={register}
+                  rules={{required: "Brand is required"}}
+                  error={errors.brandId}
+                  required
+                  placeholder={loadingBrands ? "Loading..." : "Select brand"}
+                  options={brandOptions}
+                  disabled={loadingBrands}
+                />
+                <Select
+                  label="Vendor"
+                  name="vendorId"
+                  register={register}
+                  rules={{required: "Vendor is required"}}
+                  error={errors.vendorId}
+                  required
+                  placeholder={loadingVendors ? "Loading..." : "Select vendor"}
+                  options={vendorOptions}
+                  disabled={loadingVendors}
+                />
+                <Select
+                  label="Unit Type"
+                  name="unitTypeId"
+                  register={register}
+                  rules={{required: "Unit type is required"}}
+                  error={errors.unitTypeId}
+                  required
+                  placeholder={loadingUnits ? "Loading..." : "Select unit type"}
+                  options={unitOptions}
+                  disabled={loadingUnits}
+                />
               </div>
-            </div>
+            </section>
 
-            {/* Section 2: Pricing & Inventory */}
-            <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm space-y-3">
-              <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
-                <span className="h-2 w-2 rounded-full bg-emerald-600"></span>
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">Inventory & Pricing</h3>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <h3 className="mb-3 border-b border-slate-100 pb-2 text-sm font-bold text-slate-800">
+                Pricing & First Stock Batch
+              </h3>
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
                 <Input
-                  label="Stock Quantity"
+                  label="Initial Stock Quantity"
                   name="stock"
                   type="number"
-                  placeholder="0"
+                  min="0"
+                  step="1"
                   register={register}
-                  rules={{ required: "Stock quantity is required", min: { value: 0, message: "Minimum value is 0" } }}
+                  rules={{min: {value: 0, message: "Minimum is 0"}}}
                   error={errors.stock}
-                  required
                 />
                 <Input
-                  label="MRP (₹)"
+                  label="Vendor MRP"
                   name="mrp"
                   type="number"
+                  min="0"
                   step="0.01"
-                  placeholder="0.00"
                   register={register}
-                  rules={{ required: "MRP is required", min: { value: 0, message: "Minimum value is 0" } }}
+                  rules={{required: "Vendor MRP is required", min: {value: 0.01, message: "Must be greater than 0"}}}
                   error={errors.mrp}
                   required
                 />
                 <Input
-                  label="Vendor Discount (%)"
+                  label="Vendor Discount %"
                   name="vendorDiscountPercentage"
                   type="number"
+                  min="0"
+                  max="100"
                   step="0.01"
-                  placeholder="0.00"
                   register={register}
                 />
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-slate-700">
+                    Purchase Price / Store Cost
+                  </label>
+                  <input
+                    value={money(purchasePrice)}
+                    readOnly
+                    className="w-full cursor-not-allowed rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700"
+                  />
+                  <p className="mt-1 text-[10px] text-slate-400">
+                    Vendor MRP − vendor discount
+                  </p>
+                </div>
                 <Input
-                  label="Customer Price / Selling Price (₹)"
+                  label="Actual Product MRP"
+                  name="productMrp"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="MRP printed on product"
+                  register={register}
+                  rules={{min: {value: 0, message: "Minimum is 0"}}}
+                  error={errors.productMrp}
+                />
+                <Input
+                  label="Customer / Selling Price"
                   name="customerPrice"
                   type="number"
+                  min="0"
                   step="0.01"
-                  placeholder="0.00"
                   register={register}
-                  rules={{ required: "Selling price is required", min: { value: 0, message: "Minimum value is 0" } }}
+                  rules={{required: "Selling price is required", min: {value: 0, message: "Minimum is 0"}}}
                   error={errors.customerPrice}
                   required
                 />
+                <Input
+                  label="Batch Number"
+                  name="batchNumber"
+                  placeholder="Optional; backend generates one"
+                  register={register}
+                />
+                <Input
+                  label="Received Date"
+                  name="receivedDate"
+                  type="date"
+                  register={register}
+                />
               </div>
-            </div>
 
-            {/* Section 3: Tax Settings */}
-            <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm space-y-3">
+              <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+                <Input
+                  label="Vendor Bill Due Date"
+                  name="dueDate"
+                  type="date"
+                  register={register}
+                />
+                <Input
+                  label="Amount Paid Now"
+                  name="amountPaidNow"
+                  type="number"
+                  min="0"
+                  max={totalBill}
+                  step="0.01"
+                  register={register}
+                />
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-slate-700">
+                    Payment Method
+                  </label>
+                  <select
+                    {...register("paymentMethod")}
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="CASH">Cash</option>
+                    <option value="UPI">UPI</option>
+                    <option value="CREDIT_CARD">Credit Card</option>
+                    <option value="DEBIT_CARD">Debit Card</option>
+                    <option value="NET_BANKING">Net Banking</option>
+                  </select>
+                </div>
+                <Input
+                  label="Transaction / Reference"
+                  name="transactionRef"
+                  placeholder="UPI reference / bank reference"
+                  register={register}
+                />
+              </div>
+
+              <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+                <Summary label="Purchase / Unit" value={money(purchasePrice)} />
+                <Summary label="Vendor Bill" value={money(totalBill)} />
+                <Summary label="Paid Now" value={money(watchedPaid)} />
+                <Summary label="Vendor Due" value={money(dueAmount)} />
+              </div>
+
+              <p className="mt-3 text-xs text-slate-500">
+                Selling price is the current customer price. Each purchase is stored as a separate stock batch with its own purchase and selling price.
+              </p>
+              {safeFloat(watchedCustomerPrice) > safeFloat(watchedMrp) && (
+                <p className="mt-1 text-xs font-medium text-amber-600">
+                  Selling price is above the vendor MRP. Verify this is intentional.
+                </p>
+              )}
+            </section>
+
+            <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
               <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                <div className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-amber-500"></span>
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">Tax Configurations</h3>
-                </div>
-                <div className="bg-slate-100 px-3 py-1 rounded-lg border border-slate-200">
-                  <Checkbox
-                    label="GST Applicable"
-                    name="gstApplicable"
-                    register={register}
-                  />
-                </div>
+                <h3 className="text-sm font-bold text-slate-800">GST</h3>
+                <Checkbox label="GST Applicable" name="gstApplicable" register={register} />
               </div>
 
               {isGstApplicable && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-amber-50/40 border border-amber-200/60 rounded-xl transition-all">
-                  <div className="bg-white p-2.5 rounded-lg border border-slate-200 flex items-center justify-between gap-2">
-                    <Checkbox label="Apply CGST" name="applyCgst" register={register} />
-                    <div className="w-24">
-                      <Input label="" name="cgstPercentage" type="number" placeholder="9%" register={register} />
-                    </div>
-                  </div>
-
-                  <div className="bg-white p-2.5 rounded-lg border border-slate-200 flex items-center justify-between gap-2">
-                    <Checkbox label="Apply SGST" name="applySgst" register={register} />
-                    <div className="w-24">
-                      <Input label="" name="sgstPercentage" type="number" placeholder="9%" register={register} />
-                    </div>
-                  </div>
-
-                  <div className="bg-white p-2.5 rounded-lg border border-slate-200 flex items-center justify-between gap-2">
-                    <Checkbox label="Apply UGST" name="applyUgst" register={register} />
-                    <div className="w-24">
-                      <Input label="" name="ugstPercentage" type="number" placeholder="0%" register={register} />
-                    </div>
-                  </div>
-
-                  <div className="bg-white p-2.5 rounded-lg border border-slate-200 flex items-center justify-between gap-2">
-                    <Checkbox label="Apply IGST" name="applyIgst" register={register} />
-                    <div className="w-24">
-                      <Input label="" name="igstPercentage" type="number" placeholder="18%" register={register} />
-                    </div>
-                  </div>
+                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <TaxField label="CGST" checkbox="applyCgst" name="cgstPercentage" register={register} />
+                  <TaxField label="SGST" checkbox="applySgst" name="sgstPercentage" register={register} />
+                  <TaxField label="UGST" checkbox="applyUgst" name="ugstPercentage" register={register} />
+                  <TaxField label="IGST" checkbox="applyIgst" name="igstPercentage" register={register} />
                 </div>
               )}
-            </div>
+            </section>
 
-            {/* Section 4: Dynamic Attributes */}
             {selectedProductTypeId && (
-              <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm space-y-3">
-                <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
-                  <span className="h-2 w-2 rounded-full bg-purple-600"></span>
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                    Product Specifications {loadingAttributes ? "(Loading...)" : `(${attributes.length})`}
-                  </h3>
-                </div>
-
+              <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                <h3 className="mb-3 border-b border-slate-100 pb-2 text-sm font-bold text-slate-800">
+                  Product Specifications {loadingAttributes ? "" : `(${attributes.length})`}
+                </h3>
                 {loadingAttributes ? (
-                  <p className="text-slate-400 italic">Fetching product attributes...</p>
-                ) : Array.isArray(attributes) && attributes.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <p className="text-sm text-slate-500">Loading attributes...</p>
+                ) : attributes.length ? (
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                     {attributes.map((attribute) => (
                       <Input
                         key={attribute.id}
                         label={attribute.name || attribute.attributeName || `Attribute #${attribute.id}`}
                         name={`attribute_${attribute.id}`}
-                        placeholder={`Enter ${attribute.name || 'value'}`}
+                        placeholder="Enter value"
                         register={register}
                       />
                     ))}
                   </div>
                 ) : (
-                  <p className="text-slate-400 italic">No additional attributes configured for this product type.</p>
+                  <p className="text-sm text-slate-500">No additional attributes configured.</p>
                 )}
-              </div>
+              </section>
             )}
-
           </form>
         </div>
 
-        {/* Footer */}
-        <div className="px-6 py-3.5 bg-white border-t border-slate-200 flex justify-end items-center gap-3 shrink-0">
+        <div className="flex shrink-0 justify-end gap-2 border-t border-slate-200 bg-white px-5 py-3">
           <button
             type="button"
-            onClick={() => {
-              setErrorMessage("");
-              onClose();
-            }}
-            className="px-4 py-2 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition cursor-pointer"
+            onClick={onClose}
+            className="rounded-lg bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200"
           >
             Cancel
           </button>
@@ -483,25 +574,37 @@ const ProductModal = ({ isOpen, onClose, onSuccess }) => {
             type="submit"
             form="product-form"
             disabled={createMutation.isPending}
-            className="px-5 py-2 text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-sm disabled:opacity-50 transition cursor-pointer flex items-center gap-2"
+            className="rounded-lg bg-[#0073b7] px-5 py-2 text-sm font-semibold text-white hover:bg-[#005f99] disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {createMutation.isPending ? (
-              <>
-                <svg className="animate-spin h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                <span>Saving Product...</span>
-              </>
-            ) : (
-              "Save Product"
-            )}
+            {createMutation.isPending ? "Saving..." : "Save Product"}
           </button>
         </div>
-
       </div>
     </div>
   );
-};
+}
 
-export default ProductModal;
+function Summary({label, value}) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+      <p className="text-[10px] font-semibold uppercase text-slate-400">{label}</p>
+      <p className="mt-1 text-sm font-bold text-slate-800">{value}</p>
+    </div>
+  );
+}
+
+function TaxField({label, checkbox, name, register}) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+      <Checkbox label={`Apply ${label}`} name={checkbox} register={register} />
+      <input
+        type="number"
+        min="0"
+        step="0.01"
+        placeholder="%"
+        {...register(name)}
+        className="w-24 rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+      />
+    </div>
+  );
+}

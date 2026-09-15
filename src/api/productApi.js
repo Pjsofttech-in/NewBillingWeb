@@ -10,7 +10,8 @@ export const fetchAllProducts = async (filters = {}) => {
   if (filters.vendorId) params.append("vendorId", filters.vendorId);
   if (filters.unitTypeId) params.append("unitTypeId", filters.unitTypeId);
 
-  const response = await API.get(`/api/products?${params.toString()}`);
+  const query = params.toString();
+  const response = await API.get(`/api/products${query ? `?${query}` : ""}`);
   return response.data;
 };
 

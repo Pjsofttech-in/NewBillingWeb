@@ -121,7 +121,7 @@ const ProductDetailsModal = ({isOpen, product, onClose}) => {
 
           <section>
             <h3 className="text-sm font-bold text-gray-800 mb-2">Pricing</h3>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
               <Info
                 label="MRP"
                 value={`₹${Number(mrp).toLocaleString()}`}
@@ -133,6 +133,10 @@ const ProductDetailsModal = ({isOpen, product, onClose}) => {
               <Info
                 label="Store / Buy Price"
                 value={`₹${Number(storePrice).toLocaleString()}`}
+              />
+              <Info
+                label="Actual Product MRP"
+                value={`₹${Number(product.productMrp ?? 0).toLocaleString()}`}
               />
               <Info
                 label="Customer Price"
@@ -147,7 +151,7 @@ const ProductDetailsModal = ({isOpen, product, onClose}) => {
 
           <section>
             <h3 className="text-sm font-bold text-gray-800 mb-2">GST</h3>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
               <Info
                 label="GST Applicable"
                 value={product.gstApplicable ? "Yes" : "No"}

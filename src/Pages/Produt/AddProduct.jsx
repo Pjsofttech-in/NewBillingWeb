@@ -9,6 +9,7 @@ import {fetchProductTypes} from "../../api/productTypeServiceApi";
 import ProductList from "./ProductList";
 import ProductModal from "./ProductModal";
 import UpdateStockModal from "./UpdateStockModal";
+import VendorBillModal from "./VendorBillModal";
 import SearchableSelect from "../../Components/Form/SearchableSelect";
 import Toast from "../../Components/Toast";
 
@@ -23,6 +24,7 @@ const AddProduct = () => {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isStockModalOpen, setIsStockModalOpen] = useState(false);
+  const [showVendorBills, setShowVendorBills] = useState(false);
   const [toast, setToast] = useState(null);
 
   // Fetch dropdown list options
@@ -131,6 +133,13 @@ const AddProduct = () => {
             >
               <span>+</span> Add Product
             </button>
+ 
+            <button
+              onClick={() => setShowVendorBills(true)}
+              className="flex-1 sm:flex-none px-3.5 py-1.5 bg-slate-900 text-white font-medium rounded-lg text-xs hover:bg-slate-800 transition shadow-sm flex items-center justify-center gap-1 cursor-pointer"
+            >
+              Vendor Bills
+            </button>
           </div>
         </div>
 
@@ -225,6 +234,11 @@ const AddProduct = () => {
         productsList={products}
         onClose={() => setIsStockModalOpen(false)}
         onSuccess={() => showToast("Stock updated successfully!", "success")}
+      />
+
+      <VendorBillModal
+        isOpen={showVendorBills}
+        onClose={() => setShowVendorBills(false)}
       />
     </div>
   );
