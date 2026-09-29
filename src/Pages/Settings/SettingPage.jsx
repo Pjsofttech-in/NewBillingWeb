@@ -8,6 +8,7 @@ import AddVendor from "./util/AddVendor";
 import AddCustomer from "./Customer/AddCustomer";
 import StoreSettings from "./Store/StoreSettings";
 import AttributeManager from "./Attribute/AttributeManager";
+import AddShippedBy from "./ShippedBy/AddShippedBy";
 
 const SettingPage = () => {
   const [activeTab, setActiveTab] = useState("vendor");
@@ -35,6 +36,8 @@ const SettingPage = () => {
         {activeTab === "productType" && <AddProductType />}
 
         {activeTab === "attributes" && <AttributeManager />}
+
+        {activeTab === "shippedBy" && <AddShippedBy />}
 
         {activeTab === "storeSettings" && <StoreSettings />}
       </div>

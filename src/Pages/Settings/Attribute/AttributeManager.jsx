@@ -78,28 +78,25 @@ const AttributeManager = () => {
       )}
 
       <div className="flex items-center gap-2 border-b border-slate-200 pb-4">
-        <Tags className="h-5 w-5 text-[#0073b7]" />
+        <Tags className="h-5 w-5 text-blue-600" />
         <div>
           <h2 className="text-base font-bold text-slate-800">
             Product Type Attributes
           </h2>
-          <p className="text-xs text-slate-500">
-            Define custom attributes (e.g. Size, Color, Material) for each
-            product type
-          </p>
+         
         </div>
       </div>
 
       {/* Product Type Picker */}
       <div className="w-full max-w-md">
-        <label className="mb-1 block text-xs font-medium text-gray-700 sm:text-sm">
+        <label className="mb-1 block text-xs font-medium text-slate-700 sm:text-sm">
           Select Product Type
         </label>
         <select
           value={selectedProductTypeId}
           disabled={loadingProductTypes}
           onChange={(e) => setSelectedProductTypeId(e.target.value)}
-          className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 sm:text-base"
+          className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-100 sm:text-base"
         >
           <option value="">
             {loadingProductTypes ? "Loading..." : "Choose a product type"}
@@ -138,7 +135,7 @@ const AttributeManager = () => {
               <button
                 type="submit"
                 disabled={createMutation.isPending}
-                className="h-[38px] cursor-pointer rounded-md bg-[#0073b7] px-5 text-sm font-semibold text-white shadow hover:bg-[#0867a0] disabled:opacity-50"
+                className="h-[38px] cursor-pointer rounded-md bg-blue-600 px-5 text-sm font-semibold text-white shadow hover:bg-blue-700 disabled:opacity-50"
               >
                 {createMutation.isPending ? "Adding..." : "Add Attribute"}
               </button>

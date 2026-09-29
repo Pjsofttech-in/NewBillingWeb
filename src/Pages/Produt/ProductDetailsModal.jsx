@@ -46,13 +46,13 @@ const ProductDetailsModal = ({isOpen, product, onClose}) => {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[92vh] overflow-hidden flex flex-col">
-        <div className="px-5 py-4 border-b bg-gray-50 flex items-start justify-between gap-4">
+        <div className="px-5 py-4 border-b bg-slate-50 flex items-start justify-between gap-4">
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-xs font-bold px-2 py-1 rounded bg-blue-100 text-blue-700">
                 #{product.id}
               </span>
-              <h2 className="text-xl font-bold text-gray-900">
+              <h2 className="text-xl font-bold text-slate-900">
                 {product.productName}
               </h2>
               <span
@@ -61,14 +61,14 @@ const ProductDetailsModal = ({isOpen, product, onClose}) => {
                 {stockStatus.label}
               </span>
             </div>
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-slate-500 mt-1">
               Complete product, pricing, GST and stock information from the
               backend.
             </p>
           </div>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-700 text-xl font-bold"
+            className="text-slate-400 hover:text-slate-700 text-xl font-bold"
           >
             ✕
           </button>
@@ -76,7 +76,7 @@ const ProductDetailsModal = ({isOpen, product, onClose}) => {
 
         <div className="p-5 overflow-y-auto space-y-5">
           <section>
-            <h3 className="text-sm font-bold text-gray-800 mb-2">
+            <h3 className="text-sm font-bold text-slate-800 mb-2">
               Product Information
             </h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -120,7 +120,7 @@ const ProductDetailsModal = ({isOpen, product, onClose}) => {
           </section>
 
           <section>
-            <h3 className="text-sm font-bold text-gray-800 mb-2">Pricing</h3>
+            <h3 className="text-sm font-bold text-slate-800 mb-2">Pricing</h3>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
               <Info
                 label="MRP"
@@ -150,7 +150,7 @@ const ProductDetailsModal = ({isOpen, product, onClose}) => {
           </section>
 
           <section>
-            <h3 className="text-sm font-bold text-gray-800 mb-2">GST</h3>
+            <h3 className="text-sm font-bold text-slate-800 mb-2">GST</h3>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
               <Info
                 label="GST Applicable"
@@ -189,17 +189,17 @@ const ProductDetailsModal = ({isOpen, product, onClose}) => {
                 }
               />
             </div>
-            <div className="mt-2 text-xs font-semibold text-gray-600">
+            <div className="mt-2 text-xs font-semibold text-slate-600">
               Total GST: <span className="text-emerald-700">{gst}%</span>
             </div>
           </section>
 
           <section>
-            <h3 className="text-sm font-bold text-gray-800 mb-2">
+            <h3 className="text-sm font-bold text-slate-800 mb-2">
               Product Type Attributes
             </h3>
             {attributes.length === 0 ? (
-              <p className="text-xs text-gray-500 bg-gray-50 border rounded-lg p-3">
+              <p className="text-xs text-slate-500 bg-slate-50 border rounded-lg p-3">
                 No attribute definitions are configured for this product type.
               </p>
             ) : (
@@ -216,7 +216,7 @@ const ProductDetailsModal = ({isOpen, product, onClose}) => {
                 ))}
               </div>
             )}
-            <p className="text-[11px] text-gray-400 mt-2">
+            <p className="text-[11px] text-slate-400 mt-2">
               The current backend exposes attribute definitions here;
               product-specific attribute values are saved through POST
               /createProductAttributeValue but are not exposed by a GET
@@ -226,15 +226,15 @@ const ProductDetailsModal = ({isOpen, product, onClose}) => {
 
           <section>
             <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-bold text-gray-800">
+              <h3 className="text-sm font-bold text-slate-800">
                 Purchase History
               </h3>
-              <span className="text-xs font-semibold text-gray-500">
+              <span className="text-xs font-semibold text-slate-500">
                 {history.length} entries
               </span>
             </div>
             {historyLoading ? (
-              <div className="py-8 text-center text-xs text-gray-500">
+              <div className="py-8 text-center text-xs text-slate-500">
                 Loading purchase history...
               </div>
             ) : historyError ? (
@@ -242,7 +242,7 @@ const ProductDetailsModal = ({isOpen, product, onClose}) => {
                 <p className="text-xs font-semibold text-red-600 mb-1">
                   Failed to load purchase history
                 </p>
-                <p className="text-[11px] text-gray-500 mb-3">
+                <p className="text-[11px] text-slate-500 mb-3">
                   {historyErrorObj?.response?.data?.message || historyErrorObj?.message || "Unknown error"}
                 </p>
                 <button
@@ -253,13 +253,13 @@ const ProductDetailsModal = ({isOpen, product, onClose}) => {
                 </button>
               </div>
             ) : history.length === 0 ? (
-              <div className="py-8 text-center text-xs text-gray-500 border rounded-lg bg-gray-50">
+              <div className="py-8 text-center text-xs text-slate-500 border rounded-lg bg-slate-50">
                 No purchase history available.
               </div>
             ) : (
               <div className="overflow-x-auto border rounded-lg">
                 <table className="w-full text-xs">
-                  <thead className="bg-gray-50 border-b">
+                  <thead className="bg-slate-50 border-b">
                     <tr>
                       <th className="p-2 text-left">Date</th>
                       <th className="p-2 text-left">Batch</th>
@@ -274,7 +274,7 @@ const ProductDetailsModal = ({isOpen, product, onClose}) => {
                     {history.map((entry) => (
                       <tr
                         key={entry.id}
-                        className="hover:bg-gray-50"
+                        className="hover:bg-slate-50"
                       >
                         <td className="p-2 whitespace-nowrap">
                           {entry.receivedDate || "N/A"}
@@ -306,10 +306,10 @@ const ProductDetailsModal = ({isOpen, product, onClose}) => {
           </section>
         </div>
 
-        <div className="px-5 py-3 border-t bg-gray-50 flex justify-end">
+        <div className="px-5 py-3 border-t bg-slate-50 flex justify-end">
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-gray-800 text-white rounded-lg text-sm font-semibold"
+            className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm font-semibold hover:bg-slate-200"
           >
             Close
           </button>
@@ -320,11 +320,11 @@ const ProductDetailsModal = ({isOpen, product, onClose}) => {
 };
 
 const Info = ({label, value}) => (
-  <div className="border rounded-lg p-2.5 bg-gray-50">
-    <span className="block text-[10px] uppercase tracking-wide text-gray-400 font-bold">
+  <div className="border rounded-lg p-2.5 bg-slate-50">
+    <span className="block text-[10px] uppercase tracking-wide text-slate-400 font-bold">
       {label}
     </span>
-    <span className="block mt-1 text-sm font-semibold text-gray-800 truncate">
+    <span className="block mt-1 text-sm font-semibold text-slate-800 truncate">
       {value}
     </span>
   </div>

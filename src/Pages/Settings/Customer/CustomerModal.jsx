@@ -74,13 +74,13 @@ const CustomerModal = ({
       <div className="bg-white w-full max-w-3xl rounded-2xl shadow-2xl overflow-hidden border border-slate-100 flex flex-col max-h-[90vh]">
         {/* Modal Header */}
         <div className="flex justify-between items-center px-6 py-4 bg-slate-50 border-b border-slate-200">
-          <h3 className="text-lg font-bold text-gray-800">
+          <h3 className="text-lg font-bold text-slate-800">
             {initialData ? "Edit Customer Details" : "Create New Customer"}
           </h3>
           <button
             type="button"
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 hover:bg-slate-200/60 p-1.5 rounded-lg transition-colors cursor-pointer"
+            className="text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 p-1.5 rounded-lg transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -166,12 +166,12 @@ const CustomerModal = ({
 
             {/* State Select Dropdown */}
             <div className="w-full">
-              <label className="block mb-1 text-xs sm:text-sm font-medium text-gray-700">
+              <label className="block mb-1 text-xs sm:text-sm font-medium text-slate-700">
                 State <span className="text-red-500">*</span>
               </label>
               <select
                 {...register("state", {required: "State is required"})}
-                className="w-full px-3 py-2 border rounded-md text-sm border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none"
+                className="w-full px-3 py-2 border rounded-md text-sm border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
               >
                 {INDIAN_STATES.map((st) => (
                   <option
@@ -196,14 +196,14 @@ const CustomerModal = ({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-sm bg-gray-100 text-gray-700 font-medium rounded-md hover:bg-gray-200 transition-colors cursor-pointer"
+              className="px-4 py-2 text-sm bg-slate-100 text-slate-700 font-medium rounded-md hover:bg-slate-200 transition-colors cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-5 py-2 text-sm bg-[#0073b7] text-white font-semibold rounded-md hover:bg-[#0867a0] disabled:opacity-50 transition-colors shadow-sm cursor-pointer"
+              className="px-5 py-2 text-sm bg-blue-600 text-white font-semibold rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors shadow-sm cursor-pointer"
             >
               {isSubmitting
                 ? "Saving..."

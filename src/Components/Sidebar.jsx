@@ -19,7 +19,7 @@ const Sidebar = () => {
     <aside
       className={`
         relative hidden md:flex flex-col justify-between border-r border-blue-400/30
-        bg-[#5b95e0] text-white transition-all duration-300 ease-in-out
+        bg-blue-500 text-white transition-all duration-300 ease-in-out
         ${isOpen ? "w-60" : "w-20"}
       `}
     >

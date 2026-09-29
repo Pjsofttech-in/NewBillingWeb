@@ -93,7 +93,7 @@ const BatchListModal = ({isOpen, product, onClose}) => {
         <div className="border-t px-5 py-3 flex justify-end">
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-slate-900 text-white rounded-lg text-sm"
+            className="px-4 py-2 bg-slate-100 text-slate-700 font-semibold rounded-lg text-sm hover:bg-slate-200"
           >
             Close
           </button>

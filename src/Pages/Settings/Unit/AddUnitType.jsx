@@ -121,7 +121,7 @@ const AddUnitType = () => {
           <button
             type="button"
             onClick={() => setIsModalOpen(true)}
-            className="flex items-center gap-2 rounded-lg bg-[#0073b7] hover:bg-[#0867a0] px-4 py-2 text-sm font-semibold text-white shadow transition-all cursor-pointer"
+            className="flex items-center gap-2 rounded-lg bg-blue-600 hover:bg-blue-700 px-4 py-2 text-sm font-semibold text-white shadow transition-all cursor-pointer"
           >
             <Plus className="h-4 w-4" />
             ADD UNIT TYPE

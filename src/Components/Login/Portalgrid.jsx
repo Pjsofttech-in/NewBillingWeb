@@ -1,14 +1,14 @@
 import {LogIn} from "lucide-react";
 
 const portals = [
-  {label: "Academy Teacher", color: "bg-[#2da5d8]"},
-  {label: "School Teacher", color: "bg-[#2fb285]"},
-  {label: "Academy Student", color: "bg-[#f39c12]"},
-  {label: "School Student", color: "bg-[#e24a8d]"},
-  {label: "Employee Portal", color: "bg-[#635bff]"},
-  {label: "Project Leader", color: "bg-[#17a2b8]"},
-  {label: "Project Member", color: "bg-[#8b5cf6]"},
-  {label: "StudyPoint User", color: "bg-[#e55353]"},
+  {label: "Academy Teacher", color: "bg-blue-500"},
+  {label: "School Teacher", color: "bg-emerald-500"},
+  {label: "Academy Student", color: "bg-amber-500"},
+  {label: "School Student", color: "bg-rose-500"},
+  {label: "Employee Portal", color: "bg-blue-600"},
+  {label: "Project Leader", color: "bg-blue-500"},
+  {label: "Project Member", color: "bg-blue-600"},
+  {label: "StudyPoint User", color: "bg-red-500"},
 ];
 
 export default function PortalGrid() {
@@ -17,15 +17,15 @@ export default function PortalGrid() {
       <div>
         {/* Header Title */}
         <div className="mb-5 flex items-center gap-2">
-          <LogIn className="h-4 w-4 text-[#f28c00]" />
-          <h2 className="text-xs font-black tracking-wider text-[#f28c00] uppercase">
+          <LogIn className="h-4 w-4 text-amber-600" />
+          <h2 className="text-xs font-black tracking-wider text-amber-600 uppercase">
             APPLICATIONS &amp; PORTALS
           </h2>
         </div>
 
         {/* Tab Switcher */}
-        <div className="mb-5 flex rounded-xl bg-[#f1f4f9] p-1 text-xs font-semibold">
-          <button className="flex-1 rounded-lg bg-[#f28c00] py-2 text-white shadow-sm transition-all">
+        <div className="mb-5 flex rounded-xl bg-slate-50 p-1 text-xs font-semibold">
+          <button className="flex-1 rounded-lg bg-amber-600 py-2 text-white shadow-sm transition-all">
             Portals
           </button>
           <button className="flex-1 rounded-lg py-2 text-slate-400 cursor-not-allowed">

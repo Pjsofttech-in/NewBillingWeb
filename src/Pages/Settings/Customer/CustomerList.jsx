@@ -70,7 +70,7 @@ const CustomerList = ({
           <button
             type="button"
             onClick={onOpenCreate}
-            className="flex items-center gap-2 rounded-lg bg-[#0073b7] hover:bg-[#0867a0] px-4 py-2 text-sm font-semibold text-white shadow transition-all cursor-pointer whitespace-nowrap"
+            className="flex items-center gap-2 rounded-lg bg-blue-600 hover:bg-blue-700 px-4 py-2 text-sm font-semibold text-white shadow transition-all cursor-pointer whitespace-nowrap"
           >
             <Plus className="h-4 w-4" />
             ADD CUSTOMER
@@ -80,8 +80,8 @@ const CustomerList = ({
 
       {/* Table Section */}
       <div className="overflow-x-auto bg-white rounded-xl shadow-sm border border-slate-200">
-        <table className="w-full text-left text-sm text-gray-600">
-          <thead className="bg-gray-50 border-b border-gray-200 text-gray-700 font-semibold uppercase text-xs">
+        <table className="w-full text-left text-sm text-slate-600">
+          <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 font-semibold uppercase text-xs">
             <tr>
               <th className="px-4 py-3.5">ID</th>
               <th className="px-4 py-3.5">Customer Name</th>
@@ -90,12 +90,12 @@ const CustomerList = ({
               <th className="px-4 py-3.5 text-right">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200">
+          <tbody className="divide-y divide-slate-200">
             {isLoading ? (
               <tr>
                 <td
                   colSpan="5"
-                  className="text-center py-8 text-gray-500"
+                  className="text-center py-8 text-slate-500"
                 >
                   Loading customer records...
                 </td>
@@ -104,7 +104,7 @@ const CustomerList = ({
               <tr>
                 <td
                   colSpan="5"
-                  className="text-center py-8 text-gray-500"
+                  className="text-center py-8 text-slate-500"
                 >
                   No customers found. Click <strong>ADD CUSTOMER</strong> to add
                   one.
@@ -114,10 +114,10 @@ const CustomerList = ({
               <tr>
                 <td
                   colSpan="5"
-                  className="text-center py-8 text-gray-500"
+                  className="text-center py-8 text-slate-500"
                 >
                   No customers matching &quot;
-                  <strong className="text-gray-700">{searchQuery}</strong>
+                  <strong className="text-slate-700">{searchQuery}</strong>
                   &quot;.
                 </td>
               </tr>
@@ -125,20 +125,20 @@ const CustomerList = ({
               filteredCustomers.map((cust) => (
                 <tr
                   key={cust.id}
-                  className="hover:bg-gray-50 transition-colors"
+                  className="hover:bg-slate-50 transition-colors"
                 >
-                  <td className="px-4 py-3.5 font-medium text-gray-900">
+                  <td className="px-4 py-3.5 font-medium text-slate-900">
                     #{cust.id}
                   </td>
-                  <td className="px-4 py-3.5 font-semibold text-gray-800">
+                  <td className="px-4 py-3.5 font-semibold text-slate-800">
                     {cust.customerName}
                   </td>
                   <td className="px-4 py-3.5">
                     <div className="flex flex-col text-xs">
-                      <span className="text-gray-800 font-medium">
+                      <span className="text-slate-800 font-medium">
                         {cust.phone}
                       </span>
-                      <span className="text-gray-500">{cust.email}</span>
+                      <span className="text-slate-500">{cust.email}</span>
                     </div>
                   </td>
                   <td className="px-4 py-3.5">
@@ -147,7 +147,7 @@ const CustomerList = ({
                         {cust.city}, {cust.state}
                       </span>
                       {cust.landmark && (
-                        <span className="text-gray-400 text-[11px]">
+                        <span className="text-slate-400 text-[11px]">
                           Near: {cust.landmark}
                         </span>
                       )}

@@ -10,12 +10,17 @@ import {
 import Toast from "../../../Components/Toast";
 import ProductTypeModal from "./ProductTypeModal";
 import DeleteConfirmModal from "../../../Components/DeleteConfirmModal";
+import Pagination from "../../../Components/Pagination"; // Ensure correct relative path
 
 const AddProductType = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [productTypeToDelete, setProductTypeToDelete] = useState(null);
   const [toast, setToast] = useState(null);
+
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   const queryClient = useQueryClient();
 
@@ -77,13 +82,23 @@ const AddProductType = () => {
     }
   };
 
-  // Search Filter: Defensive checks across possible payload structures
+  // Filter List
   const filteredProductTypes = Array.isArray(productTypes)
     ? productTypes.filter((pt) => {
         const typeValue = pt?.typeName || pt?.productType || pt?.name || "";
         return typeValue.toLowerCase().includes(searchTerm.toLowerCase());
       })
     : [];
+
+  // Pagination Logic
+  const totalItems = filteredProductTypes.length;
+  const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedProductTypes = filteredProductTypes.slice(
+    startIndex,
+    endIndex,
+  );
 
   return (
     <div className="space-y-6">
@@ -105,7 +120,10 @@ const AddProductType = () => {
             type="text"
             placeholder="Search Product Type..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setCurrentPage(1); // Reset to page 1 on search
+            }}
             className="w-full rounded-full border border-slate-300 py-2 pl-9 pr-4 text-sm outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
@@ -119,7 +137,7 @@ const AddProductType = () => {
           <button
             type="button"
             onClick={() => setIsModalOpen(true)}
-            className="flex cursor-pointer items-center gap-2 rounded-lg bg-[#0073b7] px-4 py-2 text-sm font-semibold text-white shadow transition-all hover:bg-[#0867a0]"
+            className="flex cursor-pointer items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow transition-all hover:bg-blue-700"
           >
             <Plus className="h-4 w-4" />
             ADD PRODUCT TYPE
@@ -157,14 +175,14 @@ const AddProductType = () => {
                   {error?.message || "Error loading product types."}
                 </td>
               </tr>
-            ) : filteredProductTypes.length > 0 ? (
-              filteredProductTypes.map((pt, index) => (
+            ) : paginatedProductTypes.length > 0 ? (
+              paginatedProductTypes.map((pt, index) => (
                 <tr
                   key={pt.id || index}
                   className="hover:bg-slate-50/80"
                 >
                   <td className="px-4 py-3 font-medium text-slate-500">
-                    {index + 1}
+                    {startIndex + index + 1}
                   </td>
                   <td className="px-4 py-3 text-slate-600">#{pt.id}</td>
                   <td className="px-4 py-3 font-bold text-slate-800">
@@ -198,6 +216,22 @@ const AddProductType = () => {
           </tbody>
         </table>
       </div>
+
+      {/* Standalone Pagination Component */}
+      {filteredProductTypes.length > 0 && (
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={totalItems}
+          startIndex={startIndex}
+          endIndex={endIndex}
+          itemsPerPage={itemsPerPage}
+          onPageChange={setCurrentPage}
+          onItemsPerPageChange={setItemsPerPage}
+          pageSizeOptions={[10, 25, 50, 100]}
+          itemName="product types"
+        />
+      )}
 
       {/* Modal Component */}
       <ProductTypeModal

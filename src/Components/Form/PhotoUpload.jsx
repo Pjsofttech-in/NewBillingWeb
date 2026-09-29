@@ -3,7 +3,7 @@ const PhotoUpload = ({name, label, register, rules, error}) => {
     <div className="w-full">
       <label
         htmlFor={name}
-        className="flex h-[92px] w-full cursor-pointer flex-col items-center justify-center rounded-md border border-dashed border-gray-300 bg-gray-50 px-2 text-center text-xs font-medium text-gray-500 hover:bg-gray-100"
+        className="flex h-[92px] w-full cursor-pointer flex-col items-center justify-center rounded-md border border-dashed border-slate-300 bg-slate-50 px-2 text-center text-xs font-medium text-slate-500 hover:bg-slate-100"
       >
         {label}
       </label>

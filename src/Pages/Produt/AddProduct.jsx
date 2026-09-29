@@ -60,16 +60,6 @@ const AddProduct = () => {
     setFilters((prev) => ({...prev, [key]: value}));
   };
 
-  const handleResetFilters = () => {
-    setFilters({
-      productName: "",
-      productTypeId: "",
-      brandId: "",
-      vendorId: "",
-      unitTypeId: "",
-    });
-  };
-
   const showToast = (message, type = "success") => setToast({message, type});
 
   const typeOptions = productTypes.map((t) => ({
@@ -90,7 +80,7 @@ const AddProduct = () => {
   }));
 
   return (
-    <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-4 space-y-4">
+    <div className="w-full px-1 sm:px-2 py-1 space-y-1.5">
       {toast && (
         <Toast
           message={toast.message}
@@ -100,43 +90,40 @@ const AddProduct = () => {
       )}
 
       {/* Integrated Filter & Actions Header */}
-      <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm space-y-3">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b pb-3">
-          {/* Left: Title & Reset */}
-          <div className="flex items-center gap-3">
-            <span className="text-lg font-bold text-gray-700">
+      <div className="w-full bg-white p-2.5 rounded-lg border border-slate-200 shadow-xs space-y-2">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-slate-100 pb-2">
+          {/* Left: Title */}
+          <div className="flex items-center gap-2">
+            {/* <span className="text-sm font-bold text-slate-800">
               Filter Products
-            </span>
-            <span className="bg-blue-50 text-blue-700 px-2.5 py-1 rounded-md text-xs font-semibold border border-blue-100">
+            </span> */}
+            {/* <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded text-[11px] font-semibold border border-blue-100">
               Total: {products.length}
-            </span>
-            <button
-              onClick={handleResetFilters}
-              className="text-xs font-semibold text-red-600 hover:text-red-700 cursor-pointer"
-            >
-              Reset Filters
-            </button>
+            </span> */}
           </div>
 
           {/* Right: Action Buttons */}
-          <div className="flex items-center gap-2.5 w-full sm:w-auto">
+          <div className="flex items-center gap-1.5 w-full sm:w-auto">
+            <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded text-[11px] font-semibold border border-blue-100">
+              Total: {products.length}
+            </span>
             <button
               onClick={() => setIsStockModalOpen(true)}
-              className="flex-1 sm:flex-none px-3.5 py-1.5 bg-emerald-600 text-white font-medium rounded-lg text-xs hover:bg-emerald-700 transition shadow-sm flex items-center justify-center gap-1 cursor-pointer"
+              className="flex-1 sm:flex-none px-2.5 py-1 bg-emerald-600 text-white font-semibold rounded text-xs hover:bg-emerald-700 transition shadow-xs flex items-center justify-center gap-1 cursor-pointer"
             >
               <span>+</span> Update Stock
             </button>
 
             <button
               onClick={() => setIsModalOpen(true)}
-              className="flex-1 sm:flex-none px-3.5 py-1.5 bg-blue-600 text-white font-medium rounded-lg text-xs hover:bg-blue-700 transition shadow-sm flex items-center justify-center gap-1 cursor-pointer"
+              className="flex-1 sm:flex-none px-2.5 py-1 bg-blue-600 text-white font-semibold rounded text-xs hover:bg-blue-700 transition shadow-xs flex items-center justify-center gap-1 cursor-pointer"
             >
               <span>+</span> Add Product
             </button>
- 
+
             <button
               onClick={() => setShowVendorBills(true)}
-              className="flex-1 sm:flex-none px-3.5 py-1.5 bg-slate-900 text-white font-medium rounded-lg text-xs hover:bg-slate-800 transition shadow-sm flex items-center justify-center gap-1 cursor-pointer"
+              className="flex-1 sm:flex-none px-2.5 py-1 bg-slate-100 text-slate-700 font-semibold rounded text-xs hover:bg-slate-200 transition shadow-xs flex items-center justify-center gap-1 cursor-pointer border border-slate-200"
             >
               Vendor Bills
             </button>
@@ -144,27 +131,28 @@ const AddProduct = () => {
         </div>
 
         {/* Filter Inputs Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
           {/* Product Name Search */}
           <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-1">
+            {/* <label className="block text-[12px] font-semibold text-slate-600 mb-0.5">
               Product Name
-            </label>
+            </label> */}
             <input
               type="text"
-              placeholder="Search product name..."
+              placeholder="Search product..."
               value={filters.productName}
               onChange={(e) =>
                 handleFilterChange("productName", e.target.value)
               }
-              className="w-full px-3 py-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 border-gray-300 transition"
+              className="w-full px-2.5 py-2 border rounded text-xs outline-none focus:ring-1 focus:ring-blue-500 border-slate-300 transition"
             />
           </div>
 
           {/* Product Type Searchable Dropdown */}
           <SearchableSelect
-            label="Product Type"
+            // label="Product Type"
             placeholder="All Types"
+            allLabel="All Types"
             options={typeOptions}
             value={filters.productTypeId}
             onChange={(val) => handleFilterChange("productTypeId", val)}
@@ -172,8 +160,9 @@ const AddProduct = () => {
 
           {/* Brand Searchable Dropdown */}
           <SearchableSelect
-            label="Brand"
+            // label="Brand"
             placeholder="All Brands"
+            allLabel="All Brands"
             options={brandOptions}
             value={filters.brandId}
             onChange={(val) => handleFilterChange("brandId", val)}
@@ -181,8 +170,9 @@ const AddProduct = () => {
 
           {/* Vendor Searchable Dropdown */}
           <SearchableSelect
-            label="Vendor"
+            // label="Vendor"
             placeholder="All Vendors"
+            allLabel="All Vendors"
             options={vendorOptions}
             value={filters.vendorId}
             onChange={(val) => handleFilterChange("vendorId", val)}
@@ -190,8 +180,9 @@ const AddProduct = () => {
 
           {/* Unit Type Searchable Dropdown */}
           <SearchableSelect
-            label="Unit Type"
+            // label="Unit Type"
             placeholder="All Units"
+            allLabel="All Units"
             options={unitOptions}
             value={filters.unitTypeId}
             onChange={(val) => handleFilterChange("unitTypeId", val)}
@@ -200,18 +191,18 @@ const AddProduct = () => {
       </div>
 
       {/* Product Table View */}
-      <div>
+      <div className="w-full">
         {isLoading && (
-          <div className="flex justify-center items-center py-16 bg-white rounded-xl border border-gray-200">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <span className="ml-3 text-gray-600 font-medium">
-              Loading filtered products...
+          <div className="flex justify-center items-center py-10 bg-white rounded border border-slate-200">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+            <span className="ml-2 text-xs text-slate-600 font-medium">
+              Loading products...
             </span>
           </div>
         )}
 
         {isError && (
-          <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-center text-red-600 text-sm font-medium">
+          <div className="p-3 bg-red-50 border border-red-200 rounded text-center text-red-600 text-xs font-medium">
             Error loading products:{" "}
             {error?.response?.data?.message ||
               error?.message ||

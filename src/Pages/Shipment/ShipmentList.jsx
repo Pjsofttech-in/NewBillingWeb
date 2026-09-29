@@ -6,12 +6,9 @@ import {
   Trash2,
   Truck,
   XCircle,
-  Filter,
-  RotateCcw,
 } from "lucide-react";
 
 import Select from "../../Components/Form/Select";
-import Input from "../../Components/Form/Input";
 import DeleteConfirmModal from "../../Components/DeleteConfirmModal";
 import Pagination from "../../Components/Pagination";
 import {usePagination} from "../../hooks/usePagination";
@@ -19,11 +16,22 @@ import {usePagination} from "../../hooks/usePagination";
 const STATUS_STYLES = {
   PREPARING: "bg-slate-100 text-slate-700",
   SHIPPED: "bg-blue-100 text-blue-800",
-  IN_TRANSIT: "bg-indigo-100 text-indigo-800",
+  IN_TRANSIT: "bg-blue-100 text-blue-800",
   OUT_FOR_DELIVERY: "bg-amber-100 text-amber-800",
   DELIVERED: "bg-green-100 text-green-800",
   CANCELLED: "bg-red-100 text-red-800",
 };
+
+const INITIAL_FILTERS = {
+  search: "",
+  status: "",
+  timeframe: "ALL",
+  fromDate: "",
+  toDate: "",
+};
+
+const dateInputClass =
+  "w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100";
 
 const ShipmentList = ({
   shipments = [],
@@ -31,17 +39,17 @@ const ShipmentList = ({
   onOpenCreate,
   onDelete,
 }) => {
-  const [filters, setFilters] = useState({
-    search: "",
-    status: "",
-    timeframe: "ALL",
-    company: "",
-    fromDate: "",
-    toDate: "",
-  });
+  const [filters, setFilters] = useState(INITIAL_FILTERS);
 
   const [shipmentToDelete, setShipmentToDelete] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  const isCustom = filters.timeframe === "CUSTOM";
+  const invalidRange =
+    isCustom &&
+    filters.fromDate &&
+    filters.toDate &&
+    filters.fromDate > filters.toDate;
 
   const updateFilter = (name, value) => {
     setFilters((prev) => ({
@@ -50,15 +58,14 @@ const ShipmentList = ({
     }));
   };
 
-  const resetFilters = () => {
-    setFilters({
-      search: "",
-      status: "",
-      timeframe: "ALL",
-      company: "",
-      fromDate: "",
-      toDate: "",
-    });
+  // Clear custom dates whenever a non-custom timeframe is chosen
+  const updateTimeframe = (value) => {
+    setFilters((prev) => ({
+      ...prev,
+      timeframe: value,
+      fromDate: value === "CUSTOM" ? prev.fromDate : "",
+      toDate: value === "CUSTOM" ? prev.toDate : "",
+    }));
   };
 
   const filteredShipments = useMemo(() => {
@@ -99,35 +106,27 @@ const ShipmentList = ({
       const matchesStatus =
         !filters.status || shipment.status === filters.status;
 
-      const matchesCompany =
-        !filters.company ||
-        shipment.companyName
-          ?.toLowerCase()
-          .includes(filters.company.toLowerCase());
+      let matchesTimeframe = true;
 
-      const matchesTimeframe =
-        filters.timeframe === "ALL" ||
-        !shipmentDate ||
-        shipmentDate >= startDate;
+      if (filters.timeframe === "CUSTOM") {
+        const from = filters.fromDate
+          ? new Date(`${filters.fromDate}T00:00:00`)
+          : null;
+        const to = filters.toDate
+          ? new Date(`${filters.toDate}T23:59:59`)
+          : null;
 
-      const matchesFromDate =
-        !filters.fromDate ||
-        (shipmentDate &&
-          shipmentDate >= new Date(`${filters.fromDate}T00:00:00`));
+        if (from || to) {
+          matchesTimeframe =
+            Boolean(shipmentDate) &&
+            (!from || shipmentDate >= from) &&
+            (!to || shipmentDate <= to);
+        }
+      } else if (filters.timeframe !== "ALL") {
+        matchesTimeframe = !shipmentDate || shipmentDate >= startDate;
+      }
 
-      const matchesToDate =
-        !filters.toDate ||
-        (shipmentDate &&
-          shipmentDate <= new Date(`${filters.toDate}T23:59:59`));
-
-      return (
-        matchesSearch &&
-        matchesStatus &&
-        matchesCompany &&
-        matchesTimeframe &&
-        matchesFromDate &&
-        matchesToDate
-      );
+      return matchesSearch && matchesStatus && matchesTimeframe;
     });
   }, [shipments, filters]);
 
@@ -165,34 +164,20 @@ const ShipmentList = ({
       />
 
       {/* Filters */}
-      <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+      <div className="rounded-xl border border-slate-200 bg-white p-4">
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-2">
-            <Filter className="h-4 w-4 text-slate-600" />
-            <span className="text-sm font-semibold text-slate-700">
-              Filters
-            </span>
+          <div className="flex items-center gap-2" />
 
+          <div className="flex items-center gap-2">
             <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700">
               {filteredShipments.length} Shipment
               {filteredShipments.length !== 1 ? "s" : ""}
             </span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={resetFilters}
-              className="flex cursor-pointer items-center gap-1 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-500 transition hover:bg-slate-200 hover:text-slate-800"
-            >
-              <RotateCcw className="h-3.5 w-3.5" />
-              Reset
-            </button>
 
             <button
               type="button"
               onClick={onOpenCreate}
-              className="flex cursor-pointer items-center gap-2 rounded-lg bg-[#0073b7] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#0867a0]"
+              className="flex cursor-pointer items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
             >
               <Plus className="h-4 w-4" />
               Create Shipment
@@ -200,14 +185,14 @@ const ShipmentList = ({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {/* Search */}
+        <div className="grid grid-cols-1 gap-3 bg-white sm:grid-cols-2 xl:grid-cols-3">
+          {/* Search (single bar: shipment, order, customer, courier, tracking) */}
           <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-slate-400" />
 
             <input
               type="text"
-              placeholder="Search shipment, order, customer, tracking..."
+              placeholder="Search shipment, order, customer, courier, tracking..."
               value={filters.search}
               onChange={(e) => updateFilter("search", e.target.value)}
               className="w-full rounded-md border border-slate-300 bg-white py-2 pl-9 pr-9 text-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
@@ -227,7 +212,8 @@ const ShipmentList = ({
           {/* Status */}
           <Select
             name="shipmentStatus"
-            placeholder="All statuses"
+            placeholder="All Statuses"
+            allowEmpty
             register={() => ({
               value: filters.status,
               onChange: (e) => updateFilter("status", e.target.value),
@@ -238,12 +224,12 @@ const ShipmentList = ({
             }))}
           />
 
-          {/* Timeframe */}
+          {/* Timeframe (includes Custom) */}
           <Select
             name="shipmentTimeframe"
             register={() => ({
               value: filters.timeframe,
-              onChange: (e) => updateFilter("timeframe", e.target.value),
+              onChange: (e) => updateTimeframe(e.target.value),
             })}
             options={[
               {value: "ALL", label: "All Time"},
@@ -251,46 +237,62 @@ const ShipmentList = ({
               {value: "7D", label: "Last 7 Days"},
               {value: "30D", label: "Last 30 Days"},
               {value: "1Y", label: "Last 1 Year"},
+              {value: "CUSTOM", label: "Custom"},
             ]}
           />
-
-          {/* Company */}
-          <Input
-            name="companyFilter"
-            placeholder="Courier / company"
-            register={() => ({
-              value: filters.company,
-              onChange: (e) => updateFilter("company", e.target.value),
-            })}
-          />
-
-          {/* From Date */}
-          <Input
-            name="fromDate"
-            type="date"
-            register={() => ({
-              value: filters.fromDate,
-              onChange: (e) => updateFilter("fromDate", e.target.value),
-            })}
-          />
-
-          {/* To Date */}
-          <Input
-            name="toDate"
-            type="date"
-            register={() => ({
-              value: filters.toDate,
-              onChange: (e) => updateFilter("toDate", e.target.value),
-            })}
-          />
         </div>
+
+        {/* Custom date range - only when "Custom" is selected */}
+        {isCustom && (
+          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            <div>
+              <label
+                htmlFor="fromDate"
+                className="mb-1 block text-xs font-semibold text-slate-600"
+              >
+                From Date
+              </label>
+              <input
+                id="fromDate"
+                type="date"
+                value={filters.fromDate}
+                max={filters.toDate || undefined}
+                onChange={(e) => updateFilter("fromDate", e.target.value)}
+                className={dateInputClass}
+              />
+            </div>
+
+            <div>
+              <label
+                htmlFor="toDate"
+                className="mb-1 block text-xs font-semibold text-slate-600"
+              >
+                To Date
+              </label>
+              <input
+                id="toDate"
+                type="date"
+                value={filters.toDate}
+                min={filters.fromDate || undefined}
+                onChange={(e) => updateFilter("toDate", e.target.value)}
+                className={dateInputClass}
+              />
+            </div>
+
+            {invalidRange && (
+              <p className="text-xs font-medium text-red-600 sm:col-span-2 xl:col-span-3">
+                "From Date" cannot be after "To Date".
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Table */}
       <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
         <table className="w-full min-w-[1000px] text-left text-sm text-slate-600">
           <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase text-slate-600">
-            <tr>
+            <tr className="border-b border-slate-200 bg-slate-50 text-[12px] font-semibold uppercase tracking-wide text-slate-800">
               <th className="px-4 py-3.5">Shipment</th>
               <th className="px-4 py-3.5">Order</th>
               <th className="px-4 py-3.5">Customer</th>

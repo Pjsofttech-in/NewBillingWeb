@@ -1,12 +1,10 @@
 import {useMemo, useState} from "react";
-
 import {useQuery} from "@tanstack/react-query";
-
 import {
   CalendarClock,
+  Pencil,
   Plus,
   Printer,
-  RotateCcw,
   SearchX,
   Trash2,
   Truck,
@@ -46,7 +44,6 @@ const formatPaymentMethod = (method) => {
 
 const getTodayString = () => {
   const date = new Date();
-
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
@@ -71,7 +68,6 @@ const getDateRange = (timeframe, customFromDate, customToDate) => {
 
   if (timeframe === "TODAY") {
     const todayString = formatDate(today);
-
     return {
       fromDate: todayString,
       toDate: todayString,
@@ -81,7 +77,6 @@ const getDateRange = (timeframe, customFromDate, customToDate) => {
   if (timeframe === "7D") {
     const from = new Date(today);
     from.setDate(today.getDate() - 6);
-
     return {
       fromDate: formatDate(from),
       toDate: formatDate(today),
@@ -91,7 +86,6 @@ const getDateRange = (timeframe, customFromDate, customToDate) => {
   if (timeframe === "30D") {
     const from = new Date(today);
     from.setDate(today.getDate() - 29);
-
     return {
       fromDate: formatDate(from),
       toDate: formatDate(today),
@@ -101,7 +95,6 @@ const getDateRange = (timeframe, customFromDate, customToDate) => {
   if (timeframe === "1Y") {
     const from = new Date(today);
     from.setFullYear(today.getFullYear() - 1);
-
     return {
       fromDate: formatDate(from),
       toDate: formatDate(today),
@@ -141,16 +134,12 @@ const getOrderStatusStyle = (status) => {
   switch (status) {
     case "DELIVERED":
       return "bg-emerald-100 text-emerald-700";
-
     case "SHIPPED":
-      return "bg-indigo-100 text-indigo-700";
-
+      return "bg-blue-100 text-blue-700";
     case "CONFIRMED":
       return "bg-blue-100 text-blue-700";
-
     case "CANCELLED":
       return "bg-red-100 text-red-700";
-
     default:
       return "bg-amber-100 text-amber-700";
   }
@@ -200,6 +189,7 @@ export default function OrderList({
   orders = [],
   isLoading,
   onOpenCreate,
+  onOpenEdit,
   onDelete,
   onOpenPayment,
   onPrintInvoice,
@@ -222,20 +212,6 @@ export default function OrderList({
       [key]: value,
     }));
   };
-
-  const handleResetFilters = () => {
-    setFilters(initialFilters);
-  };
-
-  const isFiltered = useMemo(() => {
-    return (
-      filters.status !== "" ||
-      filters.timeframe !== "ALL" ||
-      filters.fromDate !== "" ||
-      filters.toDate !== "" ||
-      filters.method !== ""
-    );
-  }, [filters]);
 
   const filteredOrders = useMemo(() => {
     const {fromDate, toDate} = getDateRange(
@@ -281,8 +257,8 @@ export default function OrderList({
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 p-2 sm:p-3 lg:p-4">
-      <div className="mx-auto max-w-[1800px] space-y-3">
+    <div className="min-h-screen bg-slate-50 p-1 sm:p-2 lg:p-3">
+      <div className="mx-auto max-w-[1800px] space-y-2">
         <DeleteConfirmModal
           isOpen={Boolean(deleteOrder)}
           title="Delete Order"
@@ -296,23 +272,12 @@ export default function OrderList({
         <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
           {/* Header */}
           <div className="flex h-10 items-center justify-between border-b border-slate-100 px-3">
-            <div>
-              {isFiltered && (
-                <button
-                  type="button"
-                  onClick={handleResetFilters}
-                  className="flex items-center gap-1 text-[11px] font-medium text-slate-500 transition hover:text-red-600"
-                >
-                  <RotateCcw className="h-3 w-3" />
-                  Reset Filters
-                </button>
-              )}
-            </div>
+            <div />
 
             <button
               type="button"
               onClick={onOpenCreate}
-              className="flex h-7 cursor-pointer items-center justify-center gap-1.5 rounded-md bg-[#0073b7] px-2.5 text-[11px] font-medium text-white transition hover:bg-[#005f99]"
+              className="flex h-7 cursor-pointer items-center justify-center gap-1.5 rounded-md bg-blue-600 px-2.5 text-[11px] font-medium text-white transition hover:bg-blue-700"
             >
               <Plus className="h-3.5 w-3.5" />
               Create Order
@@ -320,10 +285,11 @@ export default function OrderList({
           </div>
 
           {/* Filters */}
-          <div className="grid grid-cols-1 items-center gap-2 p-2.5 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-1 items-center gap-2 p-2 sm:grid-cols-2 lg:grid-cols-4">
             <Select
               name="status"
-              placeholder="Order Status"
+              placeholder="All Statuses"
+              allowEmpty
               register={(name) => ({
                 value: filters[name],
                 onChange: (event) => updateFilter(name, event.target.value),
@@ -347,36 +313,19 @@ export default function OrderList({
                 onChange: (event) => updateFilter(name, event.target.value),
               })}
               options={[
-                {
-                  value: "ALL",
-                  label: "All Time",
-                },
-                {
-                  value: "TODAY",
-                  label: "Today",
-                },
-                {
-                  value: "7D",
-                  label: "Last 7 Days",
-                },
-                {
-                  value: "30D",
-                  label: "Last 30 Days",
-                },
-                {
-                  value: "1Y",
-                  label: "Last 1 Year",
-                },
-                {
-                  value: "CUSTOM",
-                  label: "Custom Date",
-                },
+                {value: "ALL", label: "All Time"},
+                {value: "TODAY", label: "Today"},
+                {value: "7D", label: "Last 7 Days"},
+                {value: "30D", label: "Last 30 Days"},
+                {value: "1Y", label: "Last 1 Year"},
+                {value: "CUSTOM", label: "Custom Date"},
               ]}
             />
 
             <Select
               name="method"
-              placeholder="Payment Method"
+              placeholder="All Payment Methods"
+              allowEmpty
               register={(name) => ({
                 value: filters[name],
                 onChange: (event) => updateFilter(name, event.target.value),
@@ -396,7 +345,7 @@ export default function OrderList({
 
           {/* Custom Date */}
           {filters.timeframe === "CUSTOM" && (
-            <div className="grid grid-cols-1 gap-2 border-t border-slate-100 bg-slate-50 p-2.5 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-2 border-t border-slate-100 bg-slate-50 p-2 sm:grid-cols-2">
               <Input
                 label="From Date"
                 name="fromDate"
@@ -429,7 +378,6 @@ export default function OrderList({
           ) : filteredOrders.length === 0 ? (
             <div className="flex flex-col items-center justify-center p-8 text-center">
               <SearchX className="h-8 w-8 text-slate-300" />
-
               <p className="mt-2 text-xs text-slate-500">
                 No orders match the selected filters.
               </p>
@@ -438,50 +386,52 @@ export default function OrderList({
             <div className="w-full overflow-x-auto">
               <table className="w-full table-fixed border-collapse text-left text-[12px] leading-tight">
                 <thead>
-                  <tr className="border-b border-slate-200 bg-slate-50 text-[9px] font-semibold uppercase tracking-wide text-slate-500">
-                    <th className="w-[4%] whitespace-nowrap px-0 py-1.5 pl-1.5">
+                  <tr className="border-b border-slate-200 bg-slate-50 text-[12px] font-semibold uppercase tracking-wide text-slate-800">
+                    <th className="w-[4%] whitespace-nowrap px-2 py-1.5 pl-2">
                       #
                     </th>
 
-                    <th className="w-[10%] whitespace-nowrap px-0 py-1.5">
+                    <th className="w-[11%] whitespace-nowrap px-2 py-1.5">
                       Customer
                     </th>
 
-                    <th className="w-[6%] whitespace-nowrap px-0 py-1.5">
+                    <th className="w-[8%] whitespace-nowrap px-2.5 py-1.5">
                       Date
                     </th>
 
-                    <th className="w-[7%] whitespace-nowrap px-0 py-1.5 pl-1.5">
+                    <th className="w-[8%] whitespace-nowrap px-2.5 py-1.5">
                       Due
                     </th>
 
-                    <th className="w-[7%] whitespace-nowrap px-0 py-1.5 text-right">
+                    <th className="w-[7%] whitespace-nowrap px-2 py-1.5 text-right">
                       Total
                     </th>
 
-                    <th className="whitespace-nowrap px-0 py-1.5 text-right">
+                    <th className="w-[7%] whitespace-nowrap px-2 py-1.5 text-right">
                       GST
                     </th>
 
-                    <th className="whitespace-nowrap px-0 py-1.5 text-right">
+                    <th className="w-[7%] whitespace-nowrap px-2 py-1.5 text-right">
                       Paid
                     </th>
 
-                    <th className="whitespace-nowrap px-0 py-1.5 text-right">
+                    <th className="w-[7%] whitespace-nowrap px-2 py-1.5 text-right">
                       Pending
                     </th>
 
-                    <th className="hidden whitespace-nowrap px-0 py-1.5 md:table-cell">
+                    <th className="hidden w-[8%] whitespace-nowrap px-2 py-1.5 md:table-cell">
                       Method
                     </th>
 
-                    <th className="whitespace-nowrap px-0 py-1.5">Pay</th>
+                    <th className="w-[6%] whitespace-nowrap px-2 py-1.5">
+                      Pay
+                    </th>
 
-                    <th className="w-[8%] whitespace-nowrap px-0 py-1.5">
+                    <th className="w-[7%] whitespace-nowrap px-2 py-1.5">
                       Status
                     </th>
 
-                    <th className="w-[12%] whitespace-nowrap px-0 py-1.5 pr-1 text-center">
+                    <th className="w-[12%] whitespace-nowrap px-2 py-1.5 pr-2 text-center">
                       Actions
                     </th>
                   </tr>
@@ -490,11 +440,8 @@ export default function OrderList({
                 <tbody className="divide-y divide-slate-100">
                   {pagination.paginatedData.map((order) => {
                     const paidAmount = getPaidAmount(order);
-
                     const pendingAmount = getPendingAmount(order);
-
                     const overdue = isOverdueOrder(order, pendingAmount);
-
                     const isFullyPaid = pendingAmount <= 0.009;
 
                     const paymentStatus =
@@ -513,54 +460,53 @@ export default function OrderList({
                         }`}
                       >
                         {/* ID */}
-                        <td className="whitespace-nowrap px-0 py-1 pl-1.5 font-semibold text-slate-700">
+                        <td className="whitespace-nowrap px-2 py-1.5 pl-2 font-semibold text-slate-700">
                           #{order.id}
                         </td>
 
                         {/* CUSTOMER */}
                         <td
-                          className="max-w-[90px] truncate px-0 py-1 pl-0 font-medium text-slate-700"
+                          className="max-w-[110px] truncate px-2 py-1.5 font-medium text-slate-700"
                           title={order.customer?.customerName}
                         >
                           {order.customer?.customerName || "N/A"}
                         </td>
 
                         {/* DATE */}
-                        <td className="whitespace-nowrap px-0 py-1 pr-1.5 text-slate-600">
+                        <td className="whitespace-nowrap px-2.5 py-1.5 text-slate-600">
                           {order.orderDate || "—"}
                         </td>
 
                         {/* DUE */}
                         <td
-                          className={`whitespace-nowrap px-0 py-1 pl-1.5 font-medium ${
+                          className={`whitespace-nowrap px-2.5 py-1.5 font-medium ${
                             overdue ? "text-red-600" : "text-slate-600"
                           }`}
                         >
-                          <div className="flex items-center gap-0">
+                          <div className="flex items-center gap-1">
                             <CalendarClock className="h-3.5 w-3.5 shrink-0" />
-
                             <span>{order.paymentDueDate || "—"}</span>
                           </div>
                         </td>
 
                         {/* TOTAL */}
-                        <td className="whitespace-nowrap px-0 py-1 text-right font-medium">
+                        <td className="whitespace-nowrap px-2 py-1.5 text-right font-medium">
                           {money(order.totalAmount)}
                         </td>
 
                         {/* GST */}
-                        <td className="whitespace-nowrap px-0 py-1 text-right font-semibold text-violet-700">
+                        <td className="whitespace-nowrap px-2 py-1.5 text-right font-semibold text-violet-700">
                           {money(order.totalGstAmount)}
                         </td>
 
                         {/* PAID */}
-                        <td className="whitespace-nowrap px-0 py-1 text-right text-emerald-700">
+                        <td className="whitespace-nowrap px-2 py-1.5 text-right text-emerald-700">
                           {money(paidAmount)}
                         </td>
 
                         {/* PENDING */}
                         <td
-                          className={`whitespace-nowrap px-0 py-1 text-right font-medium ${
+                          className={`whitespace-nowrap px-2 py-1.5 text-right font-medium ${
                             overdue ? "text-red-600" : "text-amber-700"
                           }`}
                         >
@@ -568,12 +514,12 @@ export default function OrderList({
                         </td>
 
                         {/* METHOD */}
-                        <td className="hidden whitespace-nowrap px-0 py-1 md:table-cell">
+                        <td className="hidden whitespace-nowrap px-2 py-1.5 md:table-cell">
                           {formatPaymentMethod(order.paymentMethod)}
                         </td>
 
                         {/* PAYMENT STATUS */}
-                        <td className="whitespace-nowrap px-0 py-1">
+                        <td className="whitespace-nowrap px-2 py-1.5">
                           <span
                             className={`inline-block rounded px-1 py-0.5 text-[8px] font-semibold leading-none ${getPaymentStatusStyle(
                               paymentStatus,
@@ -586,7 +532,7 @@ export default function OrderList({
                         </td>
 
                         {/* ORDER STATUS */}
-                        <td className="whitespace-nowrap px-0 py-1">
+                        <td className="whitespace-nowrap px-2 py-1.5">
                           <span
                             className={`inline-block rounded px-1 py-0.5 text-[8px] font-semibold leading-none ${getOrderStatusStyle(
                               order.status,
@@ -597,15 +543,36 @@ export default function OrderList({
                         </td>
 
                         {/* ACTIONS */}
-                        <td className="px-0 py-1 pr-1">
-                          <div className="flex items-center justify-center gap-0">
+                        <td className="px-2 py-1.5 pr-2">
+                          <div className="flex items-center justify-center gap-1">
+                            {/* Edit */}
+                            <button
+                              type="button"
+                              onClick={() => onOpenEdit(order)}
+                              disabled={
+                                order.status === "SHIPPED" ||
+                                order.status === "DELIVERED" ||
+                                order.status === "CANCELLED"
+                              }
+                              title={
+                                order.status === "SHIPPED" ||
+                                order.status === "DELIVERED" ||
+                                order.status === "CANCELLED"
+                                  ? "Order cannot be edited in this status"
+                                  : "Edit Order"
+                              }
+                              className="rounded bg-amber-50 p-1 text-amber-700 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-35"
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </button>
+
                             {/* Payment */}
                             <button
                               type="button"
                               onClick={() => onOpenPayment(order)}
                               disabled={isFullyPaid}
                               title={isFullyPaid ? "Paid" : "Make Payment"}
-                              className="rounded bg-blue-600 px-1 py-1 text-[8px] font-medium leading-none text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
+                              className="rounded bg-blue-600 px-1.5 py-1 text-[8px] font-medium leading-none text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
                             >
                               {isFullyPaid ? "Paid" : "Pay"}
                             </button>
@@ -625,7 +592,7 @@ export default function OrderList({
                               type="button"
                               onClick={() => onCreateShipment(order)}
                               title="Create Shipment"
-                              className="rounded bg-indigo-50 p-1 text-indigo-700 hover:bg-indigo-100"
+                              className="rounded bg-blue-50 p-1 text-blue-700 hover:bg-blue-100"
                             >
                               <Truck className="h-3.5 w-3.5" />
                             </button>
@@ -634,8 +601,16 @@ export default function OrderList({
                             <button
                               type="button"
                               onClick={() => setDeleteOrder(order)}
-                              title="Delete"
-                              className="rounded bg-red-50 p-1 text-red-600 hover:bg-red-100"
+                              disabled={
+                                order.status === "SHIPPED" ||
+                                order.status === "DELIVERED"
+                              }
+                              title={
+                                order.status === "SHIPPED" || order.status === "DELIVERED"
+                                  ? "Shipped/delivered orders cannot be deleted"
+                                  : "Delete"
+                              }
+                              className="rounded bg-red-50 p-1 text-red-600 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-35"
                             >
                               <Trash2 className="h-3.5 w-3.5" />
                             </button>

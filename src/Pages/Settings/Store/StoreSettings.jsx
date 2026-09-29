@@ -104,7 +104,7 @@ const StoreProfileForm = ({showToast}) => {
         <button
           type="submit"
           disabled={mutation.isPending}
-          className="cursor-pointer rounded-lg bg-[#0073b7] px-5 py-2 text-sm font-semibold text-white shadow hover:bg-[#0867a0] disabled:opacity-50"
+          className="cursor-pointer rounded-lg bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700 disabled:opacity-50"
         >
           {mutation.isPending ? "Saving..." : "Save Store Profile"}
         </button>
@@ -123,7 +123,7 @@ const BankDetailsForm = ({showToast}) => {
   const edit=a=>{setEditing(a);reset(a)};
   const cancel=()=>{setEditing(null);reset()};
   if(isLoading)return <p className="text-sm text-slate-500">Loading bank accounts...</p>;
-  return <div className="space-y-5"><div className="rounded-xl border border-blue-100 bg-blue-50 p-3 text-sm text-blue-800">Add multiple Savings or Current accounts. Enable <b>Accepting Payments</b> only for accounts customers are allowed to pay into. Mark one account as default.</div><div className="overflow-x-auto rounded-xl border border-slate-200"><table className="w-full min-w-[900px] text-sm"><thead><tr className="bg-slate-50 text-left text-xs uppercase text-slate-500"><th className="p-3">Account</th><th className="p-3">Bank / Type</th><th className="p-3">Account No.</th><th className="p-3">UPI</th><th className="p-3">Accepting</th><th className="p-3">Active</th><th className="p-3">Default</th><th className="p-3">Actions</th></tr></thead><tbody>{accounts.length===0?<tr><td colSpan="8" className="p-5 text-center text-slate-400">No bank accounts added.</td></tr>:accounts.map(a=><tr key={a.id} className="border-t"><td className="p-3 font-semibold">{a.accountName||"—"}</td><td className="p-3">{a.bankName}<br/><span className="text-xs text-slate-500">{a.accountType}</span></td><td className="p-3">{a.accountNumber}</td><td className="p-3">{a.upiId||"—"}</td><td className="p-3">{a.acceptingPayments?"Yes":"No"}</td><td className="p-3">{a.active?"Yes":"No"}</td><td className="p-3">{a.defaultAccount?"Yes":"No"}</td><td className="p-3"><button onClick={()=>edit(a)} className="mr-2 text-blue-600">Edit</button><button onClick={()=>remove.mutate(a.id)} className="text-red-600">Delete</button></td></tr>)}</tbody></table></div><form onSubmit={handleSubmit(v=>save.mutate(v))} className="space-y-4 rounded-xl border border-slate-200 p-4"><div className="flex items-center justify-between"><h3 className="font-bold text-slate-800">{editing?`Edit ${editing.accountName||"Bank Account"}`:"Add Bank Account"}</h3>{editing&&<button type="button" onClick={cancel} className="text-sm text-slate-500">Cancel edit</button>}</div><div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"><Input label="Account Name" name="accountName" register={register} rules={{required:"Account name is required"}} error={errors.accountName} required placeholder="Main UPI Account"/><Input label="Bank Name" name="bankName" register={register} rules={{required:"Bank name is required"}} error={errors.bankName} required/><Select label="Account Type" name="accountType" register={register} rules={{required:"Select account type"}} error={errors.accountType} options={[{value:"SAVINGS",label:"Savings"},{value:"CURRENT",label:"Current"}]}/><Input label="Account Number" name="accountNumber" register={register} rules={{required:"Account number is required"}} error={errors.accountNumber} required/><Input label="IFSC Code" name="ifscCode" register={register}/><Input label="Branch Name" name="branchName" register={register}/><Input label="UPI ID" name="upiId" register={register}/></div><div className="flex flex-wrap gap-5"><Checkbox label="Accepting Payments" name="acceptingPayments" register={register}/><Checkbox label="Active" name="active" register={register}/><Checkbox label="Default Account" name="defaultAccount" register={register}/></div><div className="flex justify-end border-t pt-4"><button type="submit" disabled={save.isPending} className="rounded-lg bg-[#0073b7] px-5 py-2 text-sm font-semibold text-white disabled:opacity-50">{save.isPending?"Saving...":editing?"Update Account":"Add Account"}</button></div></form></div>;
+  return <div className="space-y-5"><div className="rounded-xl border border-blue-100 bg-blue-50 p-3 text-sm text-blue-800">Add multiple Savings or Current accounts. Enable <b>Accepting Payments</b> only for accounts customers are allowed to pay into. Mark one account as default.</div><div className="overflow-x-auto rounded-xl border border-slate-200"><table className="w-full min-w-[900px] text-sm"><thead><tr className="bg-slate-50 text-left text-xs uppercase text-slate-500"><th className="p-3">Account</th><th className="p-3">Bank / Type</th><th className="p-3">Account No.</th><th className="p-3">UPI</th><th className="p-3">Accepting</th><th className="p-3">Active</th><th className="p-3">Default</th><th className="p-3">Actions</th></tr></thead><tbody>{accounts.length===0?<tr><td colSpan="8" className="p-5 text-center text-slate-400">No bank accounts added.</td></tr>:accounts.map(a=><tr key={a.id} className="border-t"><td className="p-3 font-semibold">{a.accountName||"—"}</td><td className="p-3">{a.bankName}<br/><span className="text-xs text-slate-500">{a.accountType}</span></td><td className="p-3">{a.accountNumber}</td><td className="p-3">{a.upiId||"—"}</td><td className="p-3">{a.acceptingPayments?"Yes":"No"}</td><td className="p-3">{a.active?"Yes":"No"}</td><td className="p-3">{a.defaultAccount?"Yes":"No"}</td><td className="p-3"><button onClick={()=>edit(a)} className="mr-2 text-blue-600">Edit</button><button onClick={()=>remove.mutate(a.id)} className="text-red-600">Delete</button></td></tr>)}</tbody></table></div><form onSubmit={handleSubmit(v=>save.mutate(v))} className="space-y-4 rounded-xl border border-slate-200 p-4"><div className="flex items-center justify-between"><h3 className="font-bold text-slate-800">{editing?`Edit ${editing.accountName||"Bank Account"}`:"Add Bank Account"}</h3>{editing&&<button type="button" onClick={cancel} className="text-sm text-slate-500">Cancel edit</button>}</div><div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"><Input label="Account Name" name="accountName" register={register} rules={{required:"Account name is required"}} error={errors.accountName} required placeholder="Main UPI Account"/><Input label="Bank Name" name="bankName" register={register} rules={{required:"Bank name is required"}} error={errors.bankName} required/><Select label="Account Type" name="accountType" register={register} rules={{required:"Select account type"}} error={errors.accountType} options={[{value:"SAVINGS",label:"Savings"},{value:"CURRENT",label:"Current"}]}/><Input label="Account Number" name="accountNumber" register={register} rules={{required:"Account number is required"}} error={errors.accountNumber} required/><Input label="IFSC Code" name="ifscCode" register={register}/><Input label="Branch Name" name="branchName" register={register}/><Input label="UPI ID" name="upiId" register={register}/></div><div className="flex flex-wrap gap-5"><Checkbox label="Accepting Payments" name="acceptingPayments" register={register}/><Checkbox label="Active" name="active" register={register}/><Checkbox label="Default Account" name="defaultAccount" register={register}/></div><div className="flex justify-end border-t pt-4"><button type="submit" disabled={save.isPending} className="rounded-lg bg-blue-600 px-5 py-2 text-sm font-semibold text-white disabled:opacity-50">{save.isPending?"Saving...":editing?"Update Account":"Add Account"}</button></div></form></div>;
 };
 
 const TermsForm = ({showToast}) => {
@@ -164,21 +164,21 @@ const TermsForm = ({showToast}) => {
       className="space-y-4"
     >
       <div className="w-full">
-        <label className="mb-1 block text-xs font-medium text-gray-700 sm:text-sm">
+        <label className="mb-1 block text-xs font-medium text-slate-700 sm:text-sm">
           Terms &amp; Conditions
         </label>
         <textarea
           rows={10}
           {...register("termsAndConditions")}
           placeholder="Enter the terms &amp; conditions shown on invoices..."
-          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 sm:text-base"
+          className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 sm:text-base"
         />
       </div>
       <div className="flex justify-end border-t border-slate-100 pt-4">
         <button
           type="submit"
           disabled={mutation.isPending}
-          className="cursor-pointer rounded-lg bg-[#0073b7] px-5 py-2 text-sm font-semibold text-white shadow hover:bg-[#0867a0] disabled:opacity-50"
+          className="cursor-pointer rounded-lg bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700 disabled:opacity-50"
         >
           {mutation.isPending ? "Saving..." : "Save Terms & Conditions"}
         </button>
@@ -215,7 +215,7 @@ const StoreSettings = () => {
               onClick={() => setActiveSubTab(tab.id)}
               className={`flex cursor-pointer items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold transition-all sm:text-sm ${
                 isActive
-                  ? "bg-[#0073b7] text-white shadow"
+                  ? "bg-blue-600 text-white shadow"
                   : "bg-slate-100 text-slate-600 hover:bg-slate-200"
               }`}
             >

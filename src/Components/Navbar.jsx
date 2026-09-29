@@ -14,7 +14,7 @@ const Navbar = () => {
 
   return (
     /* Height increased to h-18 */
-    <header className="flex h-18 w-full items-center justify-between bg-[#5b95e0] px-4 text-white shadow-md shadow-blue-900/20 sm:px-6 relative z-30">
+    <header className="flex h-18 w-full items-center justify-between bg-blue-500 px-4 text-white shadow-md shadow-blue-900/20 sm:px-6 relative z-30">
       {/* Left Brand / Logo Section */}
       <div className="flex items-center gap-3">
         {/* Logo Container */}
@@ -40,7 +40,7 @@ const Navbar = () => {
         <div className="relative group py-2">
           <button
             type="button"
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-[#5b95e0] shadow transition-transform group-hover:scale-105 cursor-pointer"
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-blue-500 shadow transition-transform group-hover:scale-105 cursor-pointer"
           >
             <User className="h-6 w-6" />
           </button>

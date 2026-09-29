@@ -5,6 +5,11 @@ export const createOrder = async (orderPayload) => {
   return response.data;
 };
 
+export const updateOrder = async ({id, ...orderPayload}) => {
+  const response = await API.put(`/updateOrder/${id}`, orderPayload);
+  return response.data;
+};
+
 export const fetchOrders = async () => {
   const response = await API.get("/getAllOrders");
   return response.data;

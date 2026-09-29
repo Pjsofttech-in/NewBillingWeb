@@ -9,6 +9,7 @@ import {
 } from "../../api/shipmentApi";
 
 import {fetchOrders, fetchOrderById} from "../../api/orderApi";
+import {fetchShippedBy} from "../../api/shippedByServiceApi";
 
 import ShipmentList from "./ShipmentList";
 import ShipmentModal from "./ShipmentModal";
@@ -21,7 +22,6 @@ const Shipment = () => {
   const requestedOrderId = searchParams.get("orderId");
 
   const [isModalOpen, setIsModalOpen] = useState(Boolean(requestedOrderId));
-
   const [toast, setToast] = useState(null);
 
   const showToast = useCallback((message, type = "success") => {
@@ -37,6 +37,12 @@ const Shipment = () => {
   const {data: orders = [], isLoading: loadingOrders} = useQuery({
     queryKey: ["orders"],
     queryFn: fetchOrders,
+    retry: 1,
+  });
+
+  const {data: shippedByList = [], isLoading: loadingShippedBy} = useQuery({
+    queryKey: ["shippedBy"],
+    queryFn: fetchShippedBy,
     retry: 1,
   });
 
@@ -67,17 +73,13 @@ const Shipment = () => {
 
   const createShipmentMutation = useMutation({
     mutationFn: createShipment,
-
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: ["shipments"],
       });
-
       closeModal();
-
       showToast("Shipment created successfully!", "success");
     },
-
     onError: (err) => {
       showToast(
         err.response?.data?.message ||
@@ -90,15 +92,12 @@ const Shipment = () => {
 
   const deleteShipmentMutation = useMutation({
     mutationFn: deleteShipment,
-
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: ["shipments"],
       });
-
       showToast("Shipment deleted successfully!", "success");
     },
-
     onError: (err) => {
       showToast(
         err.response?.data?.message ||
@@ -114,9 +113,9 @@ const Shipment = () => {
   };
 
   return (
-    <div className="p-1 sm:p-2">
+    <div className="w-full px-1 sm:px-2 py-1 space-y-1.5">
       {toast && (
-        <div className="relative z-[100]">
+        <div className="relative z-100">
           <Toast
             message={toast.message}
             type={toast.type}
@@ -137,6 +136,8 @@ const Shipment = () => {
         onClose={closeModal}
         onSubmit={(payload) => createShipmentMutation.mutateAsync(payload)}
         orders={orders}
+        shippedByList={shippedByList}
+        loadingShippedBy={loadingShippedBy}
         selectedOrder={selectedOrder}
         preselectedOrderId={requestedOrderId}
         loadingOrders={loadingOrders || loadingSelectedOrder}

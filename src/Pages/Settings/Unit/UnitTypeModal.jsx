@@ -67,7 +67,7 @@ const UnitTypeModal = ({isOpen, onClose, onSubmit, isSubmitting}) => {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="rounded-lg bg-[#0073b7] px-5 py-2 text-sm font-semibold text-white shadow hover:bg-[#0867a0] disabled:opacity-50 cursor-pointer"
+              className="rounded-lg bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700 disabled:opacity-50 cursor-pointer"
             >
               {isSubmitting ? "Saving..." : "Save Unit"}
             </button>

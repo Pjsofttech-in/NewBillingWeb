@@ -29,7 +29,7 @@ const topBarStyles = {
     shadow: "drop-shadow-[0_6px_12px_rgba(5,150,105,0.85)]",
   },
   department: {
-    gradient: "from-indigo-600 via-indigo-400/40 to-transparent",
+    gradient: "from-blue-600 via-blue-400/40 to-transparent",
     shadow: "drop-shadow-[0_6px_12px_rgba(67,56,202,0.85)]",
   },
   staff: {
@@ -55,7 +55,7 @@ function Field({field, showPassword, onTogglePassword, register, errors}) {
         error={errors?.[field.name || field.id]}
         className={`w-full rounded-xl border-slate-200 bg-white py-3.5 pl-11 ${
           isPassword ? "pr-10" : "pr-4"
-        } text-sm font-medium text-slate-700 placeholder:text-slate-400 outline-none transition-all focus:border-[#f28c00] focus:ring-1 focus:ring-[#f28c00]`}
+        } text-sm font-medium text-slate-700 placeholder:text-slate-400 outline-none transition-all focus:border-amber-600 focus:ring-1 focus:ring-amber-600`}
       />
 
       {isPassword && (
@@ -130,7 +130,7 @@ export default function LoginPanel({tab, register, errors, onSubmit}) {
 
               <button
                 type="submit"
-                className="mt-2 w-full rounded-xl bg-[#f28c00] py-3.5 text-sm font-bold text-white shadow-lg shadow-amber-500/25 transition-all duration-200 hover:bg-[#e08200] active:scale-[0.98] cursor-pointer"
+                className="mt-2 w-full rounded-xl bg-amber-600 py-3.5 text-sm font-bold text-white shadow-lg shadow-amber-500/25 transition-all duration-200 hover:bg-amber-700 active:scale-[0.98] cursor-pointer"
               >
                 Sign In
               </button>

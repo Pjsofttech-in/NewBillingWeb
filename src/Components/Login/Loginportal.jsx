@@ -51,7 +51,7 @@ export default function LoginPortal() {
   };
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center bg-[#f4f6fb] p-6 font-sans">
+    <div className="relative flex min-h-screen items-center justify-center bg-slate-50 p-6 font-sans">
       {/* Background Grid Pattern */}
       <div
         className="pointer-events-none absolute inset-0 opacity-100"
@@ -73,9 +73,9 @@ export default function LoginPortal() {
         {/* Right Side Card */}
         <div className="flex w-full md:w-195 overflow-hidden rounded-[28px] bg-white shadow-xl shadow-slate-200/70 border border-slate-100/80">
           {/* Left Navigation Sidebar */}
-          <div className="flex w-55 shrink-0 flex-col justify-between border-r border-slate-200 py-6 bg-gray-50">
+          <div className="flex w-55 shrink-0 flex-col justify-between border-r border-slate-200 py-6 bg-slate-50">
             <div className="flex flex-col gap-4 w-full">
-              <div className="px-6 py-2 border-b border-gray-200">
+              <div className="px-6 py-2 border-b border-slate-200">
                 <BrandMark />
               </div>
 
@@ -86,7 +86,7 @@ export default function LoginPortal() {
               />
             </div>
 
-            <div className="px-6 pt-4 border-t border-gray-200">
+            <div className="px-6 pt-4 border-t border-slate-200">
               <p className="text-[10px] font-medium tracking-wide text-slate-400">
                 © 2026 PJSOFTTECH PVT. LTD.
               </p>

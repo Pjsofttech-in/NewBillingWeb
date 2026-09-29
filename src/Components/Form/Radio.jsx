@@ -12,7 +12,7 @@ const Radio = ({
   return (
     <div className={`w-full ${className}`}>
       {label && (
-        <p className="text-sm font-medium mb-2 text-gray-700">
+        <p className="text-sm font-medium mb-2 text-slate-700">
           {label}
           {required && <span className="text-red-500 ml-1">*</span>}
         </p>

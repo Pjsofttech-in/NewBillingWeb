@@ -5,7 +5,10 @@ import {updateProductStock} from "../../api/productApi";
 import SearchableSelect from "../../Components/Form/SearchableSelect";
 
 const money = (v) =>
-  `₹${Number(v || 0).toLocaleString("en-IN", {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+  `₹${Number(v || 0).toLocaleString("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
 
 const UpdateStockModal = ({
   isOpen,
@@ -21,15 +24,13 @@ const UpdateStockModal = ({
   const [mrp, setMrp] = useState("");
   const [vendorDiscountPercentage, setVendorDiscountPercentage] = useState("");
   const [productMrp, setProductMrp] = useState("");
-  // customerPrice is the ONLY manually-typed price. Store/purchase price is
-  // always derived from MRP - discount%, never typed directly, so it can
-  // never drift out of sync with what the vendor actually charged.
   const [customerPrice, setCustomerPrice] = useState("");
   const [batchNumber, setBatchNumber] = useState("");
   const [receivedDate, setReceivedDate] = useState(
     new Date().toISOString().slice(0, 10),
   );
 
+  const [paymentOption, setPaymentOption] = useState("PENDING");
   const [dueDate, setDueDate] = useState("");
   const [amountPaidNow, setAmountPaidNow] = useState("0");
   const [paymentMethod, setPaymentMethod] = useState("CASH");
@@ -60,15 +61,37 @@ const UpdateStockModal = ({
     setReceivedDate(new Date().toISOString().slice(0, 10));
   }, [isOpen, product]);
 
-  // ---- Store / Purchase Price = MRP - (MRP * discount% / 100) ----
-  // This is THE single source of truth for what we pay per unit on this
-  // batch. It automatically recalculates any time MRP or discount changes.
   const storePrice = useMemo(() => {
     const mrpNum = Number(mrp) || 0;
-    const discountNum = Math.max(0, Math.min(100, Number(vendorDiscountPercentage) || 0));
+    const discountNum = Math.max(
+      0,
+      Math.min(100, Number(vendorDiscountPercentage) || 0),
+    );
     const calculated = mrpNum - (mrpNum * discountNum) / 100;
     return Math.max(0, Number(calculated.toFixed(2)));
   }, [mrp, vendorDiscountPercentage]);
+
+  const qty = Math.max(0, Number.parseInt(addedQuantity, 10) || 0);
+  const totalBill = storePrice * qty;
+  const paidAmount = Math.max(0, Number(amountPaidNow) || 0);
+  const dueAmount = Math.max(0, totalBill - paidAmount);
+  const isVendorBillPaid = totalBill > 0 && paidAmount >= totalBill - 0.009;
+
+  const handlePaymentOptionChange = (option) => {
+    setPaymentOption(option);
+    if (option === "PAID") {
+      setAmountPaidNow(totalBill.toString());
+      setDueDate("");
+    } else {
+      setAmountPaidNow("0");
+    }
+  };
+
+  useEffect(() => {
+    if (paymentOption === "PAID") {
+      setAmountPaidNow(totalBill.toString());
+    }
+  }, [totalBill, paymentOption]);
 
   const updateMutation = useMutation({
     mutationFn: (payload) =>
@@ -97,15 +120,13 @@ const UpdateStockModal = ({
     setTransactionRef("");
     setRemarks("");
     setDueDate("");
+    setPaymentOption("PENDING");
     setError("");
     onClose();
   };
 
   const currentStock = activeProduct?.stock ?? 0;
-  const qty = Math.max(0, Number.parseInt(addedQuantity, 10) || 0);
   const projectedStock = currentStock + qty;
-  const totalBill = storePrice * qty;
-  const due = Math.max(0, totalBill - (Number(amountPaidNow) || 0));
 
   const vendorOptions = useMemo(
     () =>
@@ -115,6 +136,7 @@ const UpdateStockModal = ({
       })),
     [vendors],
   );
+
   const productOptions = useMemo(
     () =>
       productsList.map((p) => ({
@@ -136,29 +158,27 @@ const UpdateStockModal = ({
       return setError("Actual product MRP cannot be negative");
     if (Number(customerPrice) < 0)
       return setError("Customer price cannot be negative");
-    if ((Number(amountPaidNow) || 0) > totalBill)
+    if (paidAmount > totalBill + 0.009)
       return setError("Paid amount cannot be greater than the vendor bill");
 
-    // storePrice/purchasePrice and customerPrice/sellingPrice are the SAME
-    // number each, sent under both names because the backend records the
-    // "current product price" (storePrice/customerPrice) AND the
-    // "this specific batch's price" (purchasePrice/sellingPrice) — but
-    // they are never independently editable, so they can't drift apart.
     updateMutation.mutate({
       addedQuantity: qty,
       vendorId: Number(selectedVendorId),
       mrp: Number(mrp),
       vendorDiscountPercentage: Number(vendorDiscountPercentage) || 0,
       storePrice: storePrice,
-      productMrp: productMrp === "" ? Number(activeProduct?.productMrp || 0) : Number(productMrp),
+      productMrp:
+        productMrp === ""
+          ? Number(activeProduct?.productMrp || 0)
+          : Number(productMrp),
       customerPrice: customerPrice === "" ? storePrice : Number(customerPrice),
       batchNumber: batchNumber.trim() || null,
       receivedDate: receivedDate || null,
       dueDate: dueDate || null,
       purchasePrice: storePrice,
       sellingPrice: customerPrice === "" ? storePrice : Number(customerPrice),
-      amountPaidNow: Number(amountPaidNow || 0),
-      paymentMethod: Number(amountPaidNow || 0) > 0 ? paymentMethod : null,
+      amountPaidNow: paidAmount,
+      paymentMethod: paidAmount > 0 ? paymentMethod : null,
       transactionRef: transactionRef || null,
       remarks: remarks || "Restocked via UI",
     });
@@ -167,262 +187,380 @@ const UpdateStockModal = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[92vh] overflow-y-auto">
-        <div className="sticky top-0 z-10 bg-white border-b px-5 py-4 flex justify-between items-center">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-3 sm:p-5 backdrop-blur-sm">
+      <div className="flex max-h-[92vh] w-full max-w-7xl flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl text-xs">
+        {/* ================= HEADER ================= */}
+        <div className="flex shrink-0 items-center justify-between border-b bg-blue-500 px-5 py-2.5 text-white">
           <div>
-            <h3 className="text-lg font-bold text-slate-900">
-              Restock Product
-            </h3>
-            <p className="text-xs text-slate-500">
-              New quantity + new batch prices. Existing prices are not averaged.
-            </p>
+            <h2 className="text-sm font-bold">Restock Product</h2>
           </div>
           <button
+            type="button"
             onClick={handleClose}
-            className="text-slate-400 hover:text-slate-700 text-xl"
+            className="rounded p-1 text-blue-100 hover:bg-blue-600 hover:text-white"
           >
             ✕
           </button>
         </div>
-        <form
-          onSubmit={handleSubmit}
-          className="p-5 space-y-5"
-        >
+
+        {/* ================= BODY (SCROLLABLE) ================= */}
+        <div className="flex-1 overflow-y-auto bg-slate-50 p-4">
           {error && (
-            <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
-              {error}
+            <div className="mb-3 flex items-center gap-2 rounded-md border border-red-200 bg-red-50 p-2.5 text-xs text-red-700">
+              <span className="font-bold">!</span>
+              <span>{error}</span>
             </div>
           )}
 
-          {!product && (
-            <SearchableSelect
-              label="Product"
-              options={productOptions}
-              value={selectedProductId}
-              onChange={setSelectedProductId}
-              placeholder="Select product"
-            />
-          )}
+          <form
+            id="restock-form"
+            onSubmit={handleSubmit}
+            className="space-y-3"
+          >
+            {/* PRODUCT SELECT & CURRENT DETAILS */}
+            <section className="rounded-lg border border-slate-200 bg-white p-3 shadow-xs">
+              <h3 className="mb-2 border-b border-slate-100 pb-1 font-bold text-slate-800">
+                Product & Vendor Information
+              </h3>
+              {!product && (
+                <div className="mb-3 max-w-md">
+                  <SearchableSelect
+                    label="Product"
+                    options={productOptions}
+                    value={selectedProductId}
+                    onChange={setSelectedProductId}
+                    placeholder="Select product"
+                  />
+                </div>
+              )}
 
-          {activeProduct && (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 bg-slate-50 rounded-xl border">
-              <div>
-                <span className="text-[10px] text-slate-500 block">
-                  CURRENT STOCK
-                </span>
-                <b>{currentStock}</b>
-              </div>
-              <div>
-                <span className="text-[10px] text-slate-500 block">
-                  CURRENT STORE PRICE
-                </span>
-                <b>{money(activeProduct.storePrice)}</b>
-              </div>
-              <div>
-                <span className="text-[10px] text-slate-500 block">
-                  CURRENT VENDOR MRP
-                </span>
-                <b>{money(activeProduct.mrp)}</b>
-              </div>
-              <div>
-                <span className="text-[10px] text-slate-500 block">
-                  CURRENT PRODUCT MRP
-                </span>
-                <b>{money(activeProduct.productMrp)}</b>
-              </div>
-              <div>
-                <span className="text-[10px] text-slate-500 block">
-                  CURRENT SELL PRICE
-                </span>
-                <b>{money(activeProduct.customerPrice)}</b>
-              </div>
-            </div>
-          )}
+              {activeProduct && (
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-5 items-start rounded-md border border-slate-100 bg-slate-50 p-2.5">
+                  <div>
+                    <span className="block text-[10px] font-semibold text-slate-400 uppercase">
+                      Current Stock
+                    </span>
+                    <strong className="text-slate-800">{currentStock}</strong>
+                  </div>
+                  <div>
+                    <span className="block text-[10px] font-semibold text-slate-400 uppercase">
+                      Current Store Price
+                    </span>
+                    <strong className="text-slate-800">
+                      {money(activeProduct.storePrice)}
+                    </strong>
+                  </div>
+                  <div>
+                    <span className="block text-[10px] font-semibold text-slate-400 uppercase">
+                      Current Vendor MRP
+                    </span>
+                    <strong className="text-slate-800">
+                      {money(activeProduct.mrp)}
+                    </strong>
+                  </div>
+                  <div>
+                    <span className="block text-[10px] font-semibold text-slate-400 uppercase">
+                      Current Product MRP
+                    </span>
+                    <strong className="text-slate-800">
+                      {money(activeProduct.productMrp)}
+                    </strong>
+                  </div>
+                  <div>
+                    <span className="block text-[10px] font-semibold text-slate-400 uppercase">
+                      Current Sell Price
+                    </span>
+                    <strong className="text-slate-800">
+                      {money(activeProduct.customerPrice)}
+                    </strong>
+                  </div>
+                </div>
+              )}
+            </section>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field
-              label="New Quantity *"
-              type="number"
-              min="1"
-              value={addedQuantity}
-              onChange={setAddedQuantity}
-            />
-            <SearchableSelect
-              label="Vendor *"
-              options={vendorOptions}
-              value={selectedVendorId}
-              onChange={setSelectedVendorId}
-              placeholder={loadingVendors ? "Loading..." : "Select vendor"}
-            />
-            <Field
-              label="Vendor MRP *"
-              type="number"
-              min="0"
-              step="0.01"
-              value={mrp}
-              onChange={setMrp}
-            />
-            <Field
-              label="Vendor Discount %"
-              type="number"
-              min="0"
-              max="100"
-              step="0.01"
-              value={vendorDiscountPercentage}
-              onChange={setVendorDiscountPercentage}
-            />
+            {/* PRICING & STOCK */}
+            <section className="rounded-lg border border-slate-200 bg-white p-3 shadow-xs">
+              <h3 className="mb-2 border-b border-slate-100 pb-1 font-bold text-slate-800">
+                Pricing & Stock
+              </h3>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-6 items-start">
+                <Field
+                  label="New Stock Qty"
+                  type="number"
+                  min="1"
+                  value={addedQuantity}
+                  onChange={setAddedQuantity}
+                  required
+                />
+                <div className="flex flex-col">
+                  <label className="mb-1 block text-xs font-semibold text-slate-700">
+                    Vendor <span className="text-red-500">*</span>
+                  </label>
+                  <SearchableSelect
+                    options={vendorOptions}
+                    value={selectedVendorId}
+                    onChange={setSelectedVendorId}
+                    placeholder={
+                      loadingVendors ? "..." : "Select vendor"
+                    }
+                  />
+                </div>
+                <Field
+                  label="Actual Product MRP"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={productMrp}
+                  onChange={setProductMrp}
+                />
+                <Field
+                  label="Vendor MRP"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={mrp}
+                  onChange={setMrp}
+                  required
+                />
+                <Field
+                  label="Vendor Disc %"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  value={vendorDiscountPercentage}
+                  onChange={setVendorDiscountPercentage}
+                />
+                <PriceDisplay
+                  label="Purchase Price"
+                  value={money(storePrice)}
+                />
+                <Field
+                  label="Selling Price"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={customerPrice}
+                  onChange={setCustomerPrice}
+                  required
+                />
+                <Field
+                  label="Batch No."
+                  value={batchNumber}
+                  onChange={setBatchNumber}
+                  placeholder="Optional"
+                />
+                <Field
+                  label="Received Date"
+                  type="date"
+                  value={receivedDate}
+                  onChange={setReceivedDate}
+                />
+              </div>
+            </section>
 
-            {/* Read-only, auto-calculated. This IS the Batch Purchase Price. */}
-            <label className="text-sm">
-              <span className="block font-semibold text-slate-700 mb-1">
-                Store / Purchase Price (auto)
-              </span>
-              <input
-                readOnly
-                value={money(storePrice)}
-                className="w-full border rounded-lg px-3 py-2 bg-slate-100 text-slate-700 font-semibold cursor-not-allowed"
+            {/* VENDOR PAYMENT SECTION */}
+            <section className="rounded-lg border border-slate-200 bg-white p-3 shadow-xs">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                <h3 className="font-bold text-slate-800">Vendor Payment</h3>
+                <div className="flex items-center gap-3 bg-slate-100 px-2.5 py-1 rounded border border-slate-200">
+                  <label className="flex items-center gap-1.5 text-[11px] font-semibold cursor-pointer text-slate-700">
+                    <input
+                      type="radio"
+                      name="paymentOptionGroup"
+                      checked={paymentOption === "PAID"}
+                      onChange={() => handlePaymentOptionChange("PAID")}
+                      className="h-3 w-3 text-emerald-600"
+                    />
+                    Paid
+                  </label>
+                  <label className="flex items-center gap-1.5 text-[11px] font-semibold cursor-pointer text-slate-700">
+                    <input
+                      type="radio"
+                      name="paymentOptionGroup"
+                      checked={paymentOption === "PENDING"}
+                      onChange={() => handlePaymentOptionChange("PENDING")}
+                      className="h-3 w-3 text-amber-600"
+                    />
+                    Pending
+                  </label>
+                </div>
+              </div>
+
+              <div className="mt-2.5 grid grid-cols-4 gap-3">
+                <PaymentSummary
+                  label="Total Bill"
+                  value={money(totalBill)}
+                />
+                <PaymentSummary
+                  label="Paid"
+                  value={money(paidAmount)}
+                />
+                <PaymentSummary
+                  label="Due"
+                  value={money(dueAmount)}
+                  danger={!isVendorBillPaid}
+                />
+                <PaymentSummary
+                  label="Status"
+                  value={isVendorBillPaid ? "Paid" : "Pending"}
+                  status
+                  paid={isVendorBillPaid}
+                />
+              </div>
+
+              {paymentOption === "PENDING" && (
+                <div className="mt-2.5 rounded border border-amber-200 bg-amber-50/40 p-2.5">
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 items-start">
+                    <Field
+                      label="Amount Paid Now"
+                      type="number"
+                      min="0"
+                      max={totalBill}
+                      step="0.01"
+                      value={amountPaidNow}
+                      onChange={setAmountPaidNow}
+                    />
+                    <Field
+                      label="Due Date"
+                      type="date"
+                      value={dueDate}
+                      onChange={setDueDate}
+                    />
+                    <div className="flex flex-col">
+                      <label className="mb-1 block text-xs font-semibold text-slate-700">
+                        Payment Method
+                      </label>
+                      <select
+                        value={paymentMethod}
+                        onChange={(e) => setPaymentMethod(e.target.value)}
+                        className="h-8 w-full rounded border border-slate-300 bg-white px-2 text-xs outline-none focus:border-blue-500"
+                      >
+                        <option value="CASH">Cash</option>
+                        <option value="UPI">UPI</option>
+                        <option value="CREDIT_CARD">Credit Card</option>
+                        <option value="DEBIT_CARD">Debit Card</option>
+                        <option value="NET_BANKING">Net Banking</option>
+                      </select>
+                    </div>
+                    <Field
+                      label="Ref / Transaction No."
+                      value={transactionRef}
+                      onChange={setTransactionRef}
+                      placeholder="UPI/Bank ref"
+                    />
+                  </div>
+                </div>
+              )}
+            </section>
+
+            {/* REMARKS */}
+            <section className="rounded-lg border border-slate-200 bg-white p-3 shadow-xs">
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Remarks
+              </label>
+              <textarea
+                value={remarks}
+                onChange={(e) => setRemarks(e.target.value)}
+                rows="2"
+                placeholder="Optional notes..."
+                className="w-full rounded border border-slate-300 p-2 text-xs outline-none focus:border-blue-500"
               />
-              <span className="text-[10px] text-slate-400 mt-1 block">
-                = MRP − (MRP × Discount%) → what we pay the vendor per unit
-              </span>
-            </label>
+            </section>
+          </form>
+        </div>
 
-            <Field
-              label="Actual Product MRP *"
-              type="number"
-              min="0"
-              step="0.01"
-              value={productMrp}
-              onChange={setProductMrp}
-            />
-
-            <Field
-              label="New Customer / Selling Price *"
-              type="number"
-              min="0"
-              step="0.01"
-              value={customerPrice}
-              onChange={setCustomerPrice}
-            />
-
-            <Field
-              label="Batch Number"
-              value={batchNumber}
-              onChange={setBatchNumber}
-              placeholder="Auto generated if blank"
-            />
-            <Field
-              label="Received Date"
-              type="date"
-              value={receivedDate}
-              onChange={setReceivedDate}
-            />
-            <Field
-              label="Vendor Bill Due Date"
-              type="date"
-              value={dueDate}
-              onChange={setDueDate}
-            />
-            <Field
-              label="Amount Paid Now"
-              type="number"
-              min="0"
-              step="0.01"
-              value={amountPaidNow}
-              onChange={setAmountPaidNow}
-            />
-            <label className="text-sm">
-              <span className="block font-semibold text-slate-700 mb-1">
-                Payment Method
-              </span>
-              <select
-                value={paymentMethod}
-                onChange={(e) => setPaymentMethod(e.target.value)}
-                className="w-full border rounded-lg px-3 py-2"
-              >
-                <option>CASH</option>
-                <option>UPI</option>
-                <option>CREDIT_CARD</option>
-                <option>DEBIT_CARD</option>
-                <option>NET_BANKING</option>
-              </select>
-            </label>
-            <Field
-              label="Transaction / UTR"
-              value={transactionRef}
-              onChange={setTransactionRef}
-            />
-          </div>
-          <label className="text-sm">
-            <span className="block font-semibold text-slate-700 mb-1">
-              Remarks
+        {/* ================= FOOTER ================= */}
+        <div className="flex shrink-0 items-center justify-between border-t border-slate-200 bg-white px-5 py-2.5">
+          <div className="text-xs text-slate-500">
+            <span>
+              Projected Stock:{" "}
+              <strong className="text-slate-800">{projectedStock}</strong>
             </span>
-            <textarea
-              value={remarks}
-              onChange={(e) => setRemarks(e.target.value)}
-              rows="2"
-              className="w-full border rounded-lg px-3 py-2"
-            />
-          </label>
-
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <Summary
-              title="New Stock"
-              value={projectedStock}
-            />
-            <Summary
-              title="New Store Price"
-              value={money(storePrice)}
-            />
-            <Summary
-              title="Vendor Bill"
-              value={money(totalBill)}
-            />
-            <Summary
-              title="Due"
-              value={money(due)}
-            />
+            <span className="mx-2">|</span>
+            {isVendorBillPaid ? (
+              <span className="font-medium text-emerald-600">
+                Vendor Payment: Paid
+              </span>
+            ) : (
+              <span>
+                Vendor Due:{" "}
+                <strong className="text-amber-600">{money(dueAmount)}</strong>
+              </span>
+            )}
           </div>
-          <div className="flex justify-end gap-3 border-t pt-4">
+
+          <div className="flex gap-2.5">
             <button
               type="button"
               onClick={handleClose}
-              className="px-5 py-2.5 rounded-lg bg-slate-100"
+              className="rounded bg-slate-100 px-3.5 py-1.5 font-medium text-slate-600 hover:bg-slate-200"
             >
               Cancel
             </button>
             <button
               type="submit"
+              form="restock-form"
               disabled={updateMutation.isPending}
-              className="px-6 py-2.5 rounded-lg bg-emerald-600 text-white font-bold disabled:opacity-50"
+              className="rounded bg-blue-600 px-4 py-1.5 font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
             >
               {updateMutation.isPending
                 ? "Updating..."
                 : "Update Stock & Create Bill"}
             </button>
           </div>
-        </form>
+        </div>
       </div>
     </div>
   );
 };
 
-const Field = ({label, value, onChange, ...props}) => (
-  <label className="text-sm">
-    <span className="block font-semibold text-slate-700 mb-1">{label}</span>
+const Field = ({label, value, onChange, required = false, ...props}) => (
+  <div className="flex flex-col">
+    <label className="mb-1 block text-xs font-semibold text-slate-700">
+      {label} {required && <span className="text-red-500">*</span>}
+    </label>
     <input
       {...props}
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full border rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500"
+      className="h-8 w-full rounded border border-slate-300 bg-white px-2 text-xs outline-none focus:border-blue-500"
     />
-  </label>
-);
-const Summary = ({title, value}) => (
-  <div className="rounded-xl border bg-slate-50 p-3">
-    <span className="text-[10px] text-slate-500 block">{title}</span>
-    <b className="text-sm text-slate-900">{value}</b>
   </div>
 );
+
+function PriceDisplay({label, value}) {
+  return (
+    <div className="flex flex-col">
+      <label className="mb-1 block text-xs font-semibold text-slate-700">
+        {label}
+      </label>
+      <div className="flex h-8 items-center w-full rounded border border-slate-200 bg-slate-100 px-2 text-xs font-semibold text-slate-700">
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function PaymentSummary({
+  label,
+  value,
+  danger = false,
+  status = false,
+  paid = false,
+}) {
+  return (
+    <div className="rounded border border-slate-200 bg-slate-50 px-2.5 py-1">
+      <p className="text-[9px] font-semibold uppercase text-slate-400">
+        {label}
+      </p>
+      <p
+        className={`font-bold ${status ? (paid ? "text-emerald-600" : "text-amber-600") : danger ? "text-amber-600" : "text-slate-800"}`}
+      >
+        {value}
+      </p>
+    </div>
+  );
+}
+
 export default UpdateStockModal;

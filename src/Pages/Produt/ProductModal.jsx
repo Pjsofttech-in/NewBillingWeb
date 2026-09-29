@@ -8,6 +8,7 @@ import {fetchBrands} from "../../api/brandServiceApi";
 import {fetchVendors} from "../../api/vendorServiceApi";
 import {fetchUnitTypes} from "../../api/unitTypeServiceApi";
 import {fetchProductTypes} from "../../api/productTypeServiceApi";
+
 import Input from "../../Components/Form/Input";
 import Select from "../../Components/Form/Select";
 import Checkbox from "../../Components/Form/Checkbox";
@@ -23,6 +24,7 @@ const DEFAULT_VALUES = {
   vendorDiscountPercentage: "0",
   productMrp: "0",
   customerPrice: "0",
+
   gstApplicable: false,
   applyCgst: false,
   applySgst: false,
@@ -32,6 +34,7 @@ const DEFAULT_VALUES = {
   sgstPercentage: "0",
   ugstPercentage: "0",
   igstPercentage: "0",
+
   receivedDate: new Date().toISOString().slice(0, 10),
   dueDate: "",
   amountPaidNow: "0",
@@ -60,6 +63,7 @@ const clampPercent = (value) => Math.max(0, Math.min(100, safeFloat(value)));
 export default function ProductModal({isOpen, onClose, onSuccess}) {
   const queryClient = useQueryClient();
   const [errorMessage, setErrorMessage] = useState("");
+  const [paymentOption, setPaymentOption] = useState("PENDING");
 
   const {
     register,
@@ -68,9 +72,21 @@ export default function ProductModal({isOpen, onClose, onSuccess}) {
     setValue,
     control,
     formState: {errors},
-  } = useForm({defaultValues: DEFAULT_VALUES});
+  } = useForm({
+    defaultValues: DEFAULT_VALUES,
+  });
 
   const isGstApplicable = useWatch({control, name: "gstApplicable"});
+  const isApplyCgst = useWatch({control, name: "applyCgst"});
+  const isApplySgst = useWatch({control, name: "applySgst"});
+  const isApplyUgst = useWatch({control, name: "applyUgst"});
+  const isApplyIgst = useWatch({control, name: "applyIgst"});
+
+  const cgstPercentage = useWatch({control, name: "cgstPercentage"});
+  const sgstPercentage = useWatch({control, name: "sgstPercentage"});
+  const ugstPercentage = useWatch({control, name: "ugstPercentage"});
+  const igstPercentage = useWatch({control, name: "igstPercentage"});
+
   const selectedProductTypeId = useWatch({control, name: "productTypeId"});
   const watchedMrp = useWatch({control, name: "mrp"});
   const watchedVendorDiscount = useWatch({
@@ -79,20 +95,75 @@ export default function ProductModal({isOpen, onClose, onSuccess}) {
   });
   const watchedStock = useWatch({control, name: "stock"});
   const watchedPaid = useWatch({control, name: "amountPaidNow"});
-  const watchedCustomerPrice = useWatch({control, name: "customerPrice"});
 
+  /*
+   * Vendor purchase price after vendor discount.
+   */
   const purchasePrice = useMemo(() => {
     const mrp = safeFloat(watchedMrp);
     const discount = clampPercent(watchedVendorDiscount);
     return Math.max(0, Number((mrp - (mrp * discount) / 100).toFixed(2)));
   }, [watchedMrp, watchedVendorDiscount]);
 
+  /*
+   * GST Amounts calculation based on purchase price
+   */
+  const cgstAmount = useMemo(
+    () =>
+      isGstApplicable && isApplyCgst
+        ? (purchasePrice * safeFloat(cgstPercentage)) / 100
+        : 0,
+    [isGstApplicable, isApplyCgst, purchasePrice, cgstPercentage],
+  );
+  const sgstAmount = useMemo(
+    () =>
+      isGstApplicable && isApplySgst
+        ? (purchasePrice * safeFloat(sgstPercentage)) / 100
+        : 0,
+    [isGstApplicable, isApplySgst, purchasePrice, sgstPercentage],
+  );
+  const ugstAmount = useMemo(
+    () =>
+      isGstApplicable && isApplyUgst
+        ? (purchasePrice * safeFloat(ugstPercentage)) / 100
+        : 0,
+    [isGstApplicable, isApplyUgst, purchasePrice, ugstPercentage],
+  );
+  const igstAmount = useMemo(
+    () =>
+      isGstApplicable && isApplyIgst
+        ? (purchasePrice * safeFloat(igstPercentage)) / 100
+        : 0,
+    [isGstApplicable, isApplyIgst, purchasePrice, igstPercentage],
+  );
+
+  /*
+   * Total vendor bill for this stock batch.
+   */
   const totalBill = useMemo(
     () => purchasePrice * Math.max(0, safeInt(watchedStock)),
     [purchasePrice, watchedStock],
   );
 
-  const dueAmount = Math.max(0, totalBill - Math.max(0, safeFloat(watchedPaid)));
+  const paidAmount = Math.max(0, safeFloat(watchedPaid));
+  const dueAmount = Math.max(0, totalBill - paidAmount);
+  const isVendorBillPaid = totalBill > 0 && paidAmount >= totalBill - 0.009;
+
+  const handlePaymentOptionChange = (option) => {
+    setPaymentOption(option);
+    if (option === "PAID") {
+      setValue("amountPaidNow", totalBill.toString());
+      setValue("dueDate", "");
+    } else {
+      setValue("amountPaidNow", "0");
+    }
+  };
+
+  useEffect(() => {
+    if (paymentOption === "PAID") {
+      setValue("amountPaidNow", totalBill.toString());
+    }
+  }, [totalBill, paymentOption, setValue]);
 
   useEffect(() => {
     if (!isGstApplicable) {
@@ -152,14 +223,9 @@ export default function ProductModal({isOpen, onClose, onSuccess}) {
   const createMutation = useMutation({
     mutationFn: async ({productPayload, stockPayload, attributeValues}) => {
       const product = await createProduct(productPayload);
-
       if (stockPayload.addedQuantity > 0) {
-        await updateProductStock({
-          id: product.id,
-          ...stockPayload,
-        });
+        await updateProductStock({id: product.id, ...stockPayload});
       }
-
       await Promise.all(
         attributeValues
           .filter((item) => String(item.value ?? "").trim() !== "")
@@ -171,14 +237,17 @@ export default function ProductModal({isOpen, onClose, onSuccess}) {
             }),
           ),
       );
-
       return product;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({queryKey: ["products"]});
       queryClient.invalidateQueries({queryKey: ["productBatches"]});
       queryClient.invalidateQueries({queryKey: ["vendorBills"]});
-      reset({...DEFAULT_VALUES, receivedDate: new Date().toISOString().slice(0, 10)});
+      reset({
+        ...DEFAULT_VALUES,
+        receivedDate: new Date().toISOString().slice(0, 10),
+      });
+      setPaymentOption("PENDING");
       setErrorMessage("");
       onSuccess?.();
       onClose();
@@ -194,7 +263,6 @@ export default function ProductModal({isOpen, onClose, onSuccess}) {
 
   const onSubmit = (data) => {
     setErrorMessage("");
-
     const quantity = safeInt(data.stock);
     const amountPaidNow = Math.max(0, safeFloat(data.amountPaidNow));
     const vendorMrp = Math.max(0, safeFloat(data.mrp));
@@ -258,7 +326,8 @@ export default function ProductModal({isOpen, onClose, onSuccess}) {
       dueDate: data.dueDate || null,
       amountPaidNow,
       paymentMethod: amountPaidNow > 0 ? data.paymentMethod : null,
-      transactionRef: amountPaidNow > 0 ? data.transactionRef?.trim() || null : null,
+      transactionRef:
+        amountPaidNow > 0 ? data.transactionRef?.trim() || null : null,
     };
 
     const attributeValues = Array.isArray(attributes)
@@ -291,44 +360,46 @@ export default function ProductModal({isOpen, onClose, onSuccess}) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
-      <div className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
-        <div className="flex shrink-0 items-center justify-between border-b bg-slate-900 px-5 py-4 text-white">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-3 sm:p-5 backdrop-blur-sm">
+      {/* Increased max-width from max-w-6xl to max-w-7xl */}
+      <div className="flex max-h-[92vh] w-full max-w-7xl flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl text-xs">
+        {/* ================= HEADER ================= */}
+        <div className="flex shrink-0 items-center justify-between border-b bg-blue-500 px-5 py-2.5 text-white">
           <div>
-            <h2 className="text-base font-bold">Add Product</h2>
-            <p className="mt-0.5 text-xs text-slate-400">
-              Product details, first stock batch, vendor bill and GST.
-            </p>
+            <h2 className="text-sm font-bold">Add Product</h2>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg p-2 text-slate-300 transition hover:bg-slate-800 hover:text-white"
-            aria-label="Close"
+            className="rounded p-1 text-blue-100 hover:bg-blue-600 hover:text-white"
           >
             ✕
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto bg-slate-50 p-5">
+        {/* ================= BODY (SCROLLABLE) ================= */}
+        <div className="flex-1 overflow-y-auto bg-slate-50 p-4">
           {errorMessage && (
-            <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-              {errorMessage}
+            <div className="mb-3 flex items-center gap-2 rounded-md border border-red-200 bg-red-50 p-2.5 text-xs text-red-700">
+              <span className="font-bold">!</span>
+              <span>{errorMessage}</span>
             </div>
           )}
 
-          <form id="product-form" onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-              <h3 className="mb-3 border-b border-slate-100 pb-2 text-sm font-bold text-slate-800">
-                Product Information
-              </h3>
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          <form
+            id="product-form"
+            onSubmit={handleSubmit(onSubmit)}
+            className="space-y-3"
+          >
+            {/* PRODUCT INFORMATION */}
+            <section className="rounded-lg border border-slate-200 bg-white p-3 shadow-xs">
+              <SectionHeader title="Product Information" />
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 items-start">
                 <Input
                   label="Product Name"
                   name="productName"
-                  placeholder="Enter product name"
                   register={register}
-                  rules={{required: "Product name is required"}}
+                  rules={{required: "Required"}}
                   error={errors.productName}
                   required
                 />
@@ -336,10 +407,10 @@ export default function ProductModal({isOpen, onClose, onSuccess}) {
                   label="Product Type"
                   name="productTypeId"
                   register={register}
-                  rules={{required: "Product type is required"}}
+                  rules={{required: "Required"}}
                   error={errors.productTypeId}
                   required
-                  placeholder={loadingTypes ? "Loading..." : "Select product type"}
+                  placeholder={loadingTypes ? "..." : "Select type"}
                   options={typeOptions}
                   disabled={loadingTypes}
                 />
@@ -347,10 +418,10 @@ export default function ProductModal({isOpen, onClose, onSuccess}) {
                   label="Brand"
                   name="brandId"
                   register={register}
-                  rules={{required: "Brand is required"}}
+                  rules={{required: "Required"}}
                   error={errors.brandId}
                   required
-                  placeholder={loadingBrands ? "Loading..." : "Select brand"}
+                  placeholder={loadingBrands ? "..." : "Select brand"}
                   options={brandOptions}
                   disabled={loadingBrands}
                 />
@@ -358,10 +429,10 @@ export default function ProductModal({isOpen, onClose, onSuccess}) {
                   label="Vendor"
                   name="vendorId"
                   register={register}
-                  rules={{required: "Vendor is required"}}
+                  rules={{required: "Required"}}
                   error={errors.vendorId}
                   required
-                  placeholder={loadingVendors ? "Loading..." : "Select vendor"}
+                  placeholder={loadingVendors ? "..." : "Select vendor"}
                   options={vendorOptions}
                   disabled={loadingVendors}
                 />
@@ -369,90 +440,17 @@ export default function ProductModal({isOpen, onClose, onSuccess}) {
                   label="Unit Type"
                   name="unitTypeId"
                   register={register}
-                  rules={{required: "Unit type is required"}}
+                  rules={{required: "Required"}}
                   error={errors.unitTypeId}
                   required
-                  placeholder={loadingUnits ? "Loading..." : "Select unit type"}
+                  placeholder={loadingUnits ? "..." : "Select unit"}
                   options={unitOptions}
                   disabled={loadingUnits}
                 />
-              </div>
-            </section>
-
-            <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-              <h3 className="mb-3 border-b border-slate-100 pb-2 text-sm font-bold text-slate-800">
-                Pricing & First Stock Batch
-              </h3>
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
                 <Input
-                  label="Initial Stock Quantity"
-                  name="stock"
-                  type="number"
-                  min="0"
-                  step="1"
-                  register={register}
-                  rules={{min: {value: 0, message: "Minimum is 0"}}}
-                  error={errors.stock}
-                />
-                <Input
-                  label="Vendor MRP"
-                  name="mrp"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  register={register}
-                  rules={{required: "Vendor MRP is required", min: {value: 0.01, message: "Must be greater than 0"}}}
-                  error={errors.mrp}
-                  required
-                />
-                <Input
-                  label="Vendor Discount %"
-                  name="vendorDiscountPercentage"
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="0.01"
-                  register={register}
-                />
-                <div>
-                  <label className="mb-1 block text-xs font-semibold text-slate-700">
-                    Purchase Price / Store Cost
-                  </label>
-                  <input
-                    value={money(purchasePrice)}
-                    readOnly
-                    className="w-full cursor-not-allowed rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700"
-                  />
-                  <p className="mt-1 text-[10px] text-slate-400">
-                    Vendor MRP − vendor discount
-                  </p>
-                </div>
-                <Input
-                  label="Actual Product MRP"
-                  name="productMrp"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  placeholder="MRP printed on product"
-                  register={register}
-                  rules={{min: {value: 0, message: "Minimum is 0"}}}
-                  error={errors.productMrp}
-                />
-                <Input
-                  label="Customer / Selling Price"
-                  name="customerPrice"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  register={register}
-                  rules={{required: "Selling price is required", min: {value: 0, message: "Minimum is 0"}}}
-                  error={errors.customerPrice}
-                  required
-                />
-                <Input
-                  label="Batch Number"
+                  label="Batch No."
                   name="batchNumber"
-                  placeholder="Optional; backend generates one"
+                  placeholder="Optional"
                   register={register}
                 />
                 <Input
@@ -463,148 +461,346 @@ export default function ProductModal({isOpen, onClose, onSuccess}) {
                 />
               </div>
 
-              <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+              {selectedProductTypeId && (
+                <div className="mt-3 border-t border-slate-100 pt-2.5">
+                  <span className="block text-[10px] font-semibold uppercase text-slate-400 mb-1.5">
+                    Specifications
+                  </span>
+                  {loadingAttributes ? (
+                    <p className="text-[10px] text-slate-400">Loading...</p>
+                  ) : attributes.length ? (
+                    <div className="flex flex-wrap gap-2.5 items-center">
+                      {attributes.map((attribute) => (
+                        <div
+                          key={attribute.id}
+                          className="inline-flex h-8 items-center gap-1.5 rounded border border-slate-200 bg-slate-50 px-2"
+                        >
+                          <span className="shrink-0 text-[10px] font-medium text-slate-600">
+                            {attribute.name || attribute.attributeName}:
+                          </span>
+                          <input
+                            type="text"
+                            placeholder="Value"
+                            {...register(`attribute_${attribute.id}`)}
+                            className="h-6 w-20 rounded border border-slate-300 bg-white px-1.5 text-xs outline-none focus:border-blue-500"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-[10px] text-slate-400 italic">
+                      No attributes found.
+                    </p>
+                  )}
+                </div>
+              )}
+            </section>
+
+            {/* PRICING & STOCK */}
+            <section className="rounded-lg border border-slate-200 bg-white p-3 shadow-xs">
+              <SectionHeader title="Pricing & Stock" />
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-6 items-start">
                 <Input
-                  label="Vendor Bill Due Date"
-                  name="dueDate"
-                  type="date"
-                  register={register}
-                />
-                <Input
-                  label="Amount Paid Now"
-                  name="amountPaidNow"
+                  label="Stock Qty"
+                  name="stock"
                   type="number"
                   min="0"
-                  max={totalBill}
+                  step="1"
+                  register={register}
+                  error={errors.stock}
+                />
+                <Input
+                  label="Actual Product MRP"
+                  name="productMrp"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  register={register}
+                  error={errors.productMrp}
+                />
+                <Input
+                  label="Vendor MRP"
+                  name="mrp"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  register={register}
+                  rules={{required: true}}
+                  error={errors.mrp}
+                  required
+                />
+                <Input
+                  label="Vendor Disc %"
+                  name="vendorDiscountPercentage"
+                  type="number"
+                  min="0"
+                  max="100"
                   step="0.01"
                   register={register}
                 />
-                <div>
-                  <label className="mb-1 block text-xs font-semibold text-slate-700">
-                    Payment Method
-                  </label>
-                  <select
-                    {...register("paymentMethod")}
-                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="CASH">Cash</option>
-                    <option value="UPI">UPI</option>
-                    <option value="CREDIT_CARD">Credit Card</option>
-                    <option value="DEBIT_CARD">Debit Card</option>
-                    <option value="NET_BANKING">Net Banking</option>
-                  </select>
-                </div>
+                <PriceDisplay
+                  label="Purchase Price"
+                  value={money(purchasePrice)}
+                />
                 <Input
-                  label="Transaction / Reference"
-                  name="transactionRef"
-                  placeholder="UPI reference / bank reference"
+                  label="Selling Price"
+                  name="customerPrice"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  register={register}
+                  rules={{required: true}}
+                  error={errors.customerPrice}
+                  required
+                />
+              </div>
+            </section>
+
+            {/* VENDOR PAYMENT */}
+            <section className="rounded-lg border border-slate-200 bg-white p-3 shadow-xs">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                <h3 className="font-bold text-slate-800">Vendor Payment</h3>
+                <div className="flex items-center gap-3 bg-slate-100 px-2.5 py-1 rounded border border-slate-200">
+                  <label className="flex items-center gap-1.5 text-[11px] font-semibold cursor-pointer text-slate-700">
+                    <input
+                      type="radio"
+                      name="paymentOptionGroup"
+                      checked={paymentOption === "PAID"}
+                      onChange={() => handlePaymentOptionChange("PAID")}
+                      className="h-3 w-3 text-emerald-600"
+                    />
+                    Paid
+                  </label>
+                  <label className="flex items-center gap-1.5 text-[11px] font-semibold cursor-pointer text-slate-700">
+                    <input
+                      type="radio"
+                      name="paymentOptionGroup"
+                      checked={paymentOption === "PENDING"}
+                      onChange={() => handlePaymentOptionChange("PENDING")}
+                      className="h-3 w-3 text-amber-600"
+                    />
+                    Pending
+                  </label>
+                </div>
+              </div>
+
+              <div className="mt-2.5 grid grid-cols-4 gap-3">
+                <PaymentSummary
+                  label="Total Bill"
+                  value={money(totalBill)}
+                />
+                <PaymentSummary
+                  label="Paid"
+                  value={money(paidAmount)}
+                />
+                <PaymentSummary
+                  label="Due"
+                  value={money(dueAmount)}
+                  danger={!isVendorBillPaid}
+                />
+                <PaymentSummary
+                  label="Status"
+                  value={isVendorBillPaid ? "Paid" : "Pending"}
+                  status
+                  paid={isVendorBillPaid}
+                />
+              </div>
+
+              {paymentOption === "PENDING" && (
+                <div className="mt-2.5 rounded border border-amber-200 bg-amber-50/40 p-2.5">
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 items-start">
+                    <Input
+                      label="Amount Paid Now"
+                      name="amountPaidNow"
+                      type="number"
+                      min="0"
+                      max={totalBill}
+                      step="0.01"
+                      register={register}
+                    />
+                    <Input
+                      label="Due Date"
+                      name="dueDate"
+                      type="date"
+                      register={register}
+                    />
+                    <div className="flex flex-col">
+                      <label className="mb-1 block text-xs font-semibold text-slate-700">
+                        Payment Method
+                      </label>
+                      <select
+                        {...register("paymentMethod")}
+                        className="h-8 w-full rounded border border-slate-300 bg-white px-2 text-xs outline-none focus:border-blue-500"
+                      >
+                        <option value="CASH">Cash</option>
+                        <option value="UPI">UPI</option>
+                        <option value="CREDIT_CARD">Credit Card</option>
+                        <option value="DEBIT_CARD">Debit Card</option>
+                        <option value="NET_BANKING">Net Banking</option>
+                      </select>
+                    </div>
+                    <Input
+                      label="Ref / Transaction No."
+                      name="transactionRef"
+                      placeholder="UPI/Bank ref"
+                      register={register}
+                    />
+                  </div>
+                </div>
+              )}
+            </section>
+
+            {/* GST SECTION */}
+            <section className="rounded-lg border border-slate-200 bg-white p-3 shadow-xs">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
+                <h3 className="font-bold text-slate-800">GST Settings</h3>
+                <Checkbox
+                  label="GST Applicable"
+                  name="gstApplicable"
                   register={register}
                 />
               </div>
 
-              <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-                <Summary label="Purchase / Unit" value={money(purchasePrice)} />
-                <Summary label="Vendor Bill" value={money(totalBill)} />
-                <Summary label="Paid Now" value={money(watchedPaid)} />
-                <Summary label="Vendor Due" value={money(dueAmount)} />
-              </div>
-
-              <p className="mt-3 text-xs text-slate-500">
-                Selling price is the current customer price. Each purchase is stored as a separate stock batch with its own purchase and selling price.
-              </p>
-              {safeFloat(watchedCustomerPrice) > safeFloat(watchedMrp) && (
-                <p className="mt-1 text-xs font-medium text-amber-600">
-                  Selling price is above the vendor MRP. Verify this is intentional.
-                </p>
-              )}
-            </section>
-
-            <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                <h3 className="text-sm font-bold text-slate-800">GST</h3>
-                <Checkbox label="GST Applicable" name="gstApplicable" register={register} />
-              </div>
-
               {isGstApplicable && (
-                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <TaxField label="CGST" checkbox="applyCgst" name="cgstPercentage" register={register} />
-                  <TaxField label="SGST" checkbox="applySgst" name="sgstPercentage" register={register} />
-                  <TaxField label="UGST" checkbox="applyUgst" name="ugstPercentage" register={register} />
-                  <TaxField label="IGST" checkbox="applyIgst" name="igstPercentage" register={register} />
+                <div className="mt-2.5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  <TaxField
+                    label="CGST"
+                    checkbox="applyCgst"
+                    name="cgstPercentage"
+                    amount={cgstAmount}
+                    register={register}
+                  />
+                  <TaxField
+                    label="SGST"
+                    checkbox="applySgst"
+                    name="sgstPercentage"
+                    amount={sgstAmount}
+                    register={register}
+                  />
+                  <TaxField
+                    label="UGST"
+                    checkbox="applyUgst"
+                    name="ugstPercentage"
+                    amount={ugstAmount}
+                    register={register}
+                  />
+                  <TaxField
+                    label="IGST"
+                    checkbox="applyIgst"
+                    name="igstPercentage"
+                    amount={igstAmount}
+                    register={register}
+                  />
                 </div>
               )}
             </section>
-
-            {selectedProductTypeId && (
-              <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                <h3 className="mb-3 border-b border-slate-100 pb-2 text-sm font-bold text-slate-800">
-                  Product Specifications {loadingAttributes ? "" : `(${attributes.length})`}
-                </h3>
-                {loadingAttributes ? (
-                  <p className="text-sm text-slate-500">Loading attributes...</p>
-                ) : attributes.length ? (
-                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                    {attributes.map((attribute) => (
-                      <Input
-                        key={attribute.id}
-                        label={attribute.name || attribute.attributeName || `Attribute #${attribute.id}`}
-                        name={`attribute_${attribute.id}`}
-                        placeholder="Enter value"
-                        register={register}
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-slate-500">No additional attributes configured.</p>
-                )}
-              </section>
-            )}
           </form>
         </div>
 
-        <div className="flex shrink-0 justify-end gap-2 border-t border-slate-200 bg-white px-5 py-3">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            form="product-form"
-            disabled={createMutation.isPending}
-            className="rounded-lg bg-[#0073b7] px-5 py-2 text-sm font-semibold text-white hover:bg-[#005f99] disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {createMutation.isPending ? "Saving..." : "Save Product"}
-          </button>
+        {/* ================= FOOTER ================= */}
+        <div className="flex shrink-0 items-center justify-between border-t border-slate-200 bg-white px-5 py-2.5">
+          <div className="text-xs text-slate-500">
+            {isVendorBillPaid ? (
+              <span className="font-medium text-emerald-600">
+                Vendor Payment: Paid
+              </span>
+            ) : (
+              <span>
+                Vendor Due:{" "}
+                <strong className="text-amber-600">{money(dueAmount)}</strong>
+              </span>
+            )}
+          </div>
+
+          <div className="flex gap-2.5">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded bg-slate-100 px-3.5 py-1.5 font-medium text-slate-600 hover:bg-slate-200"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              form="product-form"
+              disabled={createMutation.isPending}
+              className="rounded bg-blue-600 px-4 py-1.5 font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+            >
+              {createMutation.isPending ? "Saving..." : "Save Product"}
+            </button>
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-function Summary({label, value}) {
+function SectionHeader({title}) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-      <p className="text-[10px] font-semibold uppercase text-slate-400">{label}</p>
-      <p className="mt-1 text-sm font-bold text-slate-800">{value}</p>
+    <h3 className="mb-2 border-b border-slate-100 pb-1 font-bold text-slate-800">
+      {title}
+    </h3>
+  );
+}
+
+function PriceDisplay({label, value}) {
+  return (
+    <div className="flex flex-col">
+      <label className="mb-2 block text-xs font-semibold text-slate-700">
+        {label}
+      </label>
+      <div className="flex h-8 items-center w-full rounded border border-slate-200 bg-slate-100 px-2 py-5 text-xs font-semibold text-slate-700">
+        {value}
+      </div>
     </div>
   );
 }
 
-function TaxField({label, checkbox, name, register}) {
+function PaymentSummary({
+  label,
+  value,
+  danger = false,
+  status = false,
+  paid = false,
+}) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
-      <Checkbox label={`Apply ${label}`} name={checkbox} register={register} />
-      <input
-        type="number"
-        min="0"
-        step="0.01"
-        placeholder="%"
-        {...register(name)}
-        className="w-24 rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+    <div className="rounded border border-slate-200 bg-slate-50 px-2.5 py-1">
+      <p className="text-[9px] font-semibold uppercase text-slate-400">
+        {label}
+      </p>
+      <p
+        className={`font-bold ${status ? (paid ? "text-emerald-600" : "text-amber-600") : danger ? "text-amber-600" : "text-slate-800"}`}
+      >
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function TaxField({label, checkbox, name, amount = 0, register}) {
+  return (
+    <div className="flex h-8 items-center justify-between rounded border border-slate-200 bg-slate-50 px-2">
+      <Checkbox
+        label={label}
+        name={checkbox}
+        register={register}
       />
+      <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-0.5">
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            placeholder="0"
+            {...register(name)}
+            className="h-6 w-12 rounded border border-slate-300 bg-white px-1 text-xs text-right outline-none focus:border-blue-500"
+          />
+          <span className="text-[10px] text-slate-400">%</span>
+        </div>
+        <span className="text-[10px] font-bold text-slate-600">
+          ({money(amount)})
+        </span>
+      </div>
     </div>
   );
 }

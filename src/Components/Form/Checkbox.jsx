@@ -10,12 +10,12 @@ const Checkbox = ({
 }) => {
   return (
     <div className="flex flex-col justify-center">
-      <label className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer select-none">
+      <label className="flex items-center gap-2 text-sm font-medium text-slate-700 cursor-pointer select-none">
         <input
           type="checkbox"
           {...register(name, rules)}
           disabled={disabled}
-          className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer disabled:cursor-not-allowed"
+          className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer disabled:cursor-not-allowed"
           {...rest}
         />
         <span>{label}</span>

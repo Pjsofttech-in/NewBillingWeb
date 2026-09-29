@@ -50,9 +50,7 @@ export const addVendorBillPayment = async ({billId, paymentData}) => {
   return data;
 };
 
-export const openVendorBillPdf = async (id) => {
-  const {data} = await API.get(`/api/vendor-bills/print/${id}`, {responseType: "blob"});
-  const url = window.URL.createObjectURL(data);
-  window.open(url, "_blank", "noopener,noreferrer");
-  setTimeout(() => window.URL.revokeObjectURL(url), 60000);
+export const markVendorBillPaymentDone = async (billId) => {
+  const {data} = await API.post(`/api/vendor-bills/${billId}/mark-paid`);
+  return data;
 };
