@@ -5,7 +5,7 @@ import {ArrowLeft, Eye, RefreshCw, Search} from "lucide-react";
 import {fetchVendorBills} from "../../api/vendorServiceApi";
 import {vendorBillInstallmentApi} from "../../api/installmentApi";
 import Pagination from "../../Components/Pagination";
-import {usePagination} from "../../hooks/usePagination";
+import {usePagination} from "../../Hooks/usePagination";
 import VendorBillDetailModal, {
   StatusBadge,
   money,
