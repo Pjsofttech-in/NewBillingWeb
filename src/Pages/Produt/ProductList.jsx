@@ -427,7 +427,7 @@ import UpdateStockModal from "./UpdateStockModal";
 import ProductDetailsModal from "./ProductDetailsModal";
 import BatchListModal from "./BatchListModal";
 import Pagination from "../../Components/Pagination";
-import {usePagination} from "../../hooks/usePagination";
+import {usePagination} from "../../Hooks/usePagination";
 import {inr, round2} from "../../utils/vendorPricing";
 
 // Color tones
