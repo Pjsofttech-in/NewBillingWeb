@@ -12,7 +12,7 @@ import Toast from "../../../Components/Toast";
 import VendorModal from "./VendorModal";
 import Pagination from "../../../Components/Pagination";
 import DeleteConfirmModal from "../../../Components/DeleteConfirmModal";
-import {usePagination} from "../../../hooks/usePagination";
+import {usePagination} from "../../../Hooks/usePagination";
 
 const AddVendor = () => {
   const [searchTerm, setSearchTerm] = useState("");
