@@ -6,11 +6,6 @@ export const fetchBrands = async () => {
   return data;
 };
 
-export const fetchBrandById = async (id) => {
-  const {data} = await API.get(`/getBrandById/${id}`);
-  return data;
-};
-
 export const createBrand = async (brandData) => {
   const {data} = await API.post("/createBrand", brandData);
   return data;

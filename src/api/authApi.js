@@ -19,8 +19,3 @@ export const loginUserApi = async ({credentials}) => {
   // Return formatted object containing the token
   return typeof data === "string" ? {token: data} : data;
 };
-
-export const fetchStaffPermissions = async (email) => {
-  const response = await API.get(`/permissionForStaff?staffEmail=${email}`);
-  return response.data;
-};

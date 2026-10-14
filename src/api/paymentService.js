@@ -10,22 +10,17 @@ export const fetchPaymentsByOrder = async (orderId) => {
   return data;
 };
 
-export const fetchPayments = async () => {
+export const getOrderById = async (orderId) => {
+  const { data } = await API.get(`/getOrderById/${orderId}`);
+  return data;
+};
+
+export const fetchAllPayments = async () => {
   const { data } = await API.get("/getAllPayments");
   return data;
 };
 
-export const fetchPaymentById = async (id) => {
-  const { data } = await API.get(`/getPaymentById/${id}`);
-  return data;
-};
-
-export const deletePayment = async (id) => {
-  const { data } = await API.delete(`/deletePayment/${id}`);
-  return data;
-};
-
-export const getOrderById = async (orderId) => {
-  const { data } = await API.get(`/getOrderById/${orderId}`);
+export const deletePayment = async (paymentId) => {
+  const { data } = await API.delete(`/deletePayment/${paymentId}`);
   return data;
 };

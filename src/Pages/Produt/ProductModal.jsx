@@ -8,20 +8,32 @@ import {fetchBrands} from "../../api/brandServiceApi";
 import {fetchVendors} from "../../api/vendorServiceApi";
 import {fetchUnitTypes} from "../../api/unitTypeServiceApi";
 import {fetchProductTypes} from "../../api/productTypeServiceApi";
+import {fetchSubCategoriesByProductType} from "../../api/subCategoryApi";
 
 import Input from "../../Components/Form/Input";
 import Select from "../../Components/Form/Select";
 import Checkbox from "../../Components/Form/Checkbox";
+import VendorDiscountFields from "../../Components/Form/VendorDiscountFields";
+import VendorPaymentDetails, {
+  EMPTY_PLAN,
+  createPlanForNewBill,
+  planFirstDate,
+  validatePlan,
+} from "../../Components/Form/VendorPaymentDetails";
+import {
+  resolveVendorPricing,
+  valueForMode,
+  vendorPricingFields,
+} from "../../utils/vendorPricing";
 
 const DEFAULT_VALUES = {
   productName: "",
   productTypeId: "",
+  subCategoryId: "",
   brandId: "",
   vendorId: "",
   unitTypeId: "",
   stock: "0",
-  mrp: "0",
-  vendorDiscountPercentage: "0",
   productMrp: "0",
   customerPrice: "0",
 
@@ -36,7 +48,6 @@ const DEFAULT_VALUES = {
   igstPercentage: "0",
 
   receivedDate: new Date().toISOString().slice(0, 10),
-  dueDate: "",
   amountPaidNow: "0",
   paymentMethod: "CASH",
   transactionRef: "",
@@ -58,12 +69,14 @@ const safeInt = (value) => {
   return Number.isFinite(number) ? number : 0;
 };
 
-const clampPercent = (value) => Math.max(0, Math.min(100, safeFloat(value)));
-
 export default function ProductModal({isOpen, onClose, onSuccess}) {
   const queryClient = useQueryClient();
   const [errorMessage, setErrorMessage] = useState("");
-  const [paymentOption, setPaymentOption] = useState("PENDING");
+  const [paymentOption, setPaymentOption] = useState("UNPAID"); // PAID | UNPAID
+  const [payInInstallments, setPayInInstallments] = useState(false);
+  const [plan, setPlan] = useState(EMPTY_PLAN);
+  const [discountMode, setDiscountMode] = useState("PERCENT");
+  const [discountValue, setDiscountValue] = useState("0");
 
   const {
     register,
@@ -88,22 +101,32 @@ export default function ProductModal({isOpen, onClose, onSuccess}) {
   const igstPercentage = useWatch({control, name: "igstPercentage"});
 
   const selectedProductTypeId = useWatch({control, name: "productTypeId"});
-  const watchedMrp = useWatch({control, name: "mrp"});
-  const watchedVendorDiscount = useWatch({
-    control,
-    name: "vendorDiscountPercentage",
-  });
+  const watchedProductMrp = useWatch({control, name: "productMrp"});
   const watchedStock = useWatch({control, name: "stock"});
   const watchedPaid = useWatch({control, name: "amountPaidNow"});
+  const watchedMethod = useWatch({control, name: "paymentMethod"});
+  const watchedRef = useWatch({control, name: "transactionRef"});
 
   /*
-   * Vendor purchase price after vendor discount.
+   * Vendor pricing is on the ACTUAL Product MRP: flat price (₹) OR discount %, the other is calculated.
    */
-  const purchasePrice = useMemo(() => {
-    const mrp = safeFloat(watchedMrp);
-    const discount = clampPercent(watchedVendorDiscount);
-    return Math.max(0, Number((mrp - (mrp * discount) / 100).toFixed(2)));
-  }, [watchedMrp, watchedVendorDiscount]);
+  const pricing = useMemo(
+    () =>
+      resolveVendorPricing({
+        productMrp: watchedProductMrp,
+        mode: discountMode,
+        value: discountValue,
+      }),
+    [watchedProductMrp, discountMode, discountValue],
+  );
+  const purchasePrice = pricing.purchasePrice;
+
+  const handleDiscountModeChange = (mode) => {
+    if (mode === discountMode) return;
+    // carry the calculated equivalent over so the number on screen stays meaningful
+    setDiscountValue(valueForMode(mode, pricing));
+    setDiscountMode(mode);
+  };
 
   /*
    * GST Amounts calculation based on purchase price
@@ -153,7 +176,7 @@ export default function ProductModal({isOpen, onClose, onSuccess}) {
     setPaymentOption(option);
     if (option === "PAID") {
       setValue("amountPaidNow", totalBill.toString());
-      setValue("dueDate", "");
+      setPayInInstallments(false);
     } else {
       setValue("amountPaidNow", "0");
     }
@@ -199,6 +222,17 @@ export default function ProductModal({isOpen, onClose, onSuccess}) {
     queryFn: fetchProductTypes,
     enabled: isOpen,
   });
+  const {data: subCategories = [], isLoading: loadingSubCategories} = useQuery({
+    queryKey: ["subCategories", selectedProductTypeId],
+    queryFn: () => fetchSubCategoriesByProductType(selectedProductTypeId),
+    enabled: Boolean(isOpen && selectedProductTypeId),
+  });
+
+  // A sub category belongs to one product type, so clear it when the type changes.
+  useEffect(() => {
+    setValue("subCategoryId", "");
+  }, [selectedProductTypeId, setValue]);
+
   const {data: brands = [], isLoading: loadingBrands} = useQuery({
     queryKey: ["brands"],
     queryFn: fetchBrands,
@@ -221,10 +255,23 @@ export default function ProductModal({isOpen, onClose, onSuccess}) {
   });
 
   const createMutation = useMutation({
-    mutationFn: async ({productPayload, stockPayload, attributeValues}) => {
+    mutationFn: async ({
+      productPayload,
+      stockPayload,
+      attributeValues,
+      installmentPlan,
+    }) => {
       const product = await createProduct(productPayload);
+      let planError = null;
       if (stockPayload.addedQuantity > 0) {
         await updateProductStock({id: product.id, ...stockPayload});
+        if (installmentPlan) {
+          // the stock purchase created the vendor bill; put it on the plan
+          planError = await createPlanForNewBill(
+            stockPayload.vendorId,
+            installmentPlan,
+          );
+        }
       }
       await Promise.all(
         attributeValues
@@ -237,19 +284,24 @@ export default function ProductModal({isOpen, onClose, onSuccess}) {
             }),
           ),
       );
-      return product;
+      return {product, planError};
     },
-    onSuccess: () => {
+    onSuccess: ({planError}) => {
       queryClient.invalidateQueries({queryKey: ["products"]});
       queryClient.invalidateQueries({queryKey: ["productBatches"]});
       queryClient.invalidateQueries({queryKey: ["vendorBills"]});
+      queryClient.invalidateQueries({queryKey: ["dashboard"]});
       reset({
         ...DEFAULT_VALUES,
         receivedDate: new Date().toISOString().slice(0, 10),
       });
-      setPaymentOption("PENDING");
+      setPaymentOption("UNPAID");
+      setPayInInstallments(false);
+      setPlan(EMPTY_PLAN);
+      setDiscountMode("PERCENT");
+      setDiscountValue("0");
       setErrorMessage("");
-      onSuccess?.();
+      onSuccess?.(planError);
       onClose();
     },
     onError: (error) => {
@@ -265,8 +317,6 @@ export default function ProductModal({isOpen, onClose, onSuccess}) {
     setErrorMessage("");
     const quantity = safeInt(data.stock);
     const amountPaidNow = Math.max(0, safeFloat(data.amountPaidNow));
-    const vendorMrp = Math.max(0, safeFloat(data.mrp));
-    const vendorDiscount = clampPercent(data.vendorDiscountPercentage);
     const actualProductMrp = Math.max(0, safeFloat(data.productMrp));
     const customerPrice = Math.max(0, safeFloat(data.customerPrice));
 
@@ -278,12 +328,16 @@ export default function ProductModal({isOpen, onClose, onSuccess}) {
       setErrorMessage("Vendor is required.");
       return;
     }
-    if (vendorMrp <= 0) {
-      setErrorMessage("Vendor MRP must be greater than 0.");
+    if (actualProductMrp <= 0) {
+      setErrorMessage("Actual Product MRP must be greater than 0.");
       return;
     }
-    if (actualProductMrp < 0 || customerPrice < 0) {
-      setErrorMessage("Product MRP and selling price cannot be negative.");
+    if (customerPrice < 0) {
+      setErrorMessage("Selling price cannot be negative.");
+      return;
+    }
+    if (pricing.error) {
+      setErrorMessage(pricing.error);
       return;
     }
     if (amountPaidNow > totalBill + 0.009) {
@@ -291,10 +345,19 @@ export default function ProductModal({isOpen, onClose, onSuccess}) {
       return;
     }
 
+    const useInstallments =
+      paymentOption === "UNPAID" && payInInstallments && quantity > 0;
+    if (useInstallments) {
+      const planProblem = validatePlan(plan, totalBill - amountPaidNow);
+      if (planProblem) {
+        setErrorMessage(planProblem);
+        return;
+      }
+    }
+
     const productPayload = {
       productName: data.productName.trim(),
-      mrp: vendorMrp,
-      vendorDiscountPercentage: vendorDiscount,
+      ...vendorPricingFields(discountMode, discountValue),
       customerPrice,
       productMrp: actualProductMrp,
       stock: 0,
@@ -308,6 +371,9 @@ export default function ProductModal({isOpen, onClose, onSuccess}) {
       applyIgst: Boolean(data.applyIgst),
       igstPercentage: data.applyIgst ? safeFloat(data.igstPercentage) : 0,
       productType: {id: safeInt(data.productTypeId)},
+      subCategory: data.subCategoryId
+        ? {id: safeInt(data.subCategoryId)}
+        : undefined,
       brand: {id: safeInt(data.brandId)},
       vendor: {id: safeInt(data.vendorId)},
       unitType: {id: safeInt(data.unitTypeId)},
@@ -316,14 +382,13 @@ export default function ProductModal({isOpen, onClose, onSuccess}) {
     const stockPayload = {
       vendorId: safeInt(data.vendorId),
       batchNumber: data.batchNumber?.trim() || undefined,
-      vendorMrp,
-      vendorDiscountPercentage: vendorDiscount,
-      purchasePrice,
+      ...vendorPricingFields(discountMode, discountValue),
       productMrp: actualProductMrp,
+      customerPrice,
       sellingPrice: customerPrice,
       addedQuantity: quantity,
       receivedDate: data.receivedDate || null,
-      dueDate: data.dueDate || null,
+      dueDate: useInstallments ? planFirstDate(plan) || null : null,
       amountPaidNow,
       paymentMethod: amountPaidNow > 0 ? data.paymentMethod : null,
       transactionRef:
@@ -337,7 +402,14 @@ export default function ProductModal({isOpen, onClose, onSuccess}) {
         }))
       : [];
 
-    createMutation.mutate({productPayload, stockPayload, attributeValues});
+    const installmentPlan = useInstallments ? plan : null;
+
+    createMutation.mutate({
+      productPayload,
+      stockPayload,
+      attributeValues,
+      installmentPlan,
+    });
   };
 
   const typeOptions = productTypes.map((item) => ({
@@ -414,6 +486,19 @@ export default function ProductModal({isOpen, onClose, onSuccess}) {
                   options={typeOptions}
                   disabled={loadingTypes}
                 />
+                {selectedProductTypeId && (
+                  <Select
+                    label="Sub Category"
+                    name="subCategoryId"
+                    register={register}
+                    placeholder={loadingSubCategories ? "..." : "None"}
+                    options={subCategories.map((item) => ({
+                      label: item.subCategoryName,
+                      value: item.id,
+                    }))}
+                    disabled={loadingSubCategories}
+                  />
+                )}
                 <Select
                   label="Brand"
                   name="brandId"
@@ -511,6 +596,7 @@ export default function ProductModal({isOpen, onClose, onSuccess}) {
                 />
                 <Input
                   label="Actual Product MRP"
+                  required
                   name="productMrp"
                   type="number"
                   min="0"
@@ -518,25 +604,12 @@ export default function ProductModal({isOpen, onClose, onSuccess}) {
                   register={register}
                   error={errors.productMrp}
                 />
-                <Input
-                  label="Vendor MRP"
-                  name="mrp"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  register={register}
-                  rules={{required: true}}
-                  error={errors.mrp}
-                  required
-                />
-                <Input
-                  label="Vendor Disc %"
-                  name="vendorDiscountPercentage"
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="0.01"
-                  register={register}
+                <VendorDiscountFields
+                  mode={discountMode}
+                  value={discountValue}
+                  onModeChange={handleDiscountModeChange}
+                  onValueChange={setDiscountValue}
+                  resolved={pricing}
                 />
                 <PriceDisplay
                   label="Purchase Price"
@@ -555,101 +628,6 @@ export default function ProductModal({isOpen, onClose, onSuccess}) {
                 />
               </div>
             </section>
-
-            {/* VENDOR PAYMENT */}
-            <section className="rounded-lg border border-slate-200 bg-white p-3 shadow-xs">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                <h3 className="font-bold text-slate-800">Vendor Payment</h3>
-                <div className="flex items-center gap-3 bg-slate-100 px-2.5 py-1 rounded border border-slate-200">
-                  <label className="flex items-center gap-1.5 text-[11px] font-semibold cursor-pointer text-slate-700">
-                    <input
-                      type="radio"
-                      name="paymentOptionGroup"
-                      checked={paymentOption === "PAID"}
-                      onChange={() => handlePaymentOptionChange("PAID")}
-                      className="h-3 w-3 text-emerald-600"
-                    />
-                    Paid
-                  </label>
-                  <label className="flex items-center gap-1.5 text-[11px] font-semibold cursor-pointer text-slate-700">
-                    <input
-                      type="radio"
-                      name="paymentOptionGroup"
-                      checked={paymentOption === "PENDING"}
-                      onChange={() => handlePaymentOptionChange("PENDING")}
-                      className="h-3 w-3 text-amber-600"
-                    />
-                    Pending
-                  </label>
-                </div>
-              </div>
-
-              <div className="mt-2.5 grid grid-cols-4 gap-3">
-                <PaymentSummary
-                  label="Total Bill"
-                  value={money(totalBill)}
-                />
-                <PaymentSummary
-                  label="Paid"
-                  value={money(paidAmount)}
-                />
-                <PaymentSummary
-                  label="Due"
-                  value={money(dueAmount)}
-                  danger={!isVendorBillPaid}
-                />
-                <PaymentSummary
-                  label="Status"
-                  value={isVendorBillPaid ? "Paid" : "Pending"}
-                  status
-                  paid={isVendorBillPaid}
-                />
-              </div>
-
-              {paymentOption === "PENDING" && (
-                <div className="mt-2.5 rounded border border-amber-200 bg-amber-50/40 p-2.5">
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 items-start">
-                    <Input
-                      label="Amount Paid Now"
-                      name="amountPaidNow"
-                      type="number"
-                      min="0"
-                      max={totalBill}
-                      step="0.01"
-                      register={register}
-                    />
-                    <Input
-                      label="Due Date"
-                      name="dueDate"
-                      type="date"
-                      register={register}
-                    />
-                    <div className="flex flex-col">
-                      <label className="mb-1 block text-xs font-semibold text-slate-700">
-                        Payment Method
-                      </label>
-                      <select
-                        {...register("paymentMethod")}
-                        className="h-8 w-full rounded border border-slate-300 bg-white px-2 text-xs outline-none focus:border-blue-500"
-                      >
-                        <option value="CASH">Cash</option>
-                        <option value="UPI">UPI</option>
-                        <option value="CREDIT_CARD">Credit Card</option>
-                        <option value="DEBIT_CARD">Debit Card</option>
-                        <option value="NET_BANKING">Net Banking</option>
-                      </select>
-                    </div>
-                    <Input
-                      label="Ref / Transaction No."
-                      name="transactionRef"
-                      placeholder="UPI/Bank ref"
-                      register={register}
-                    />
-                  </div>
-                </div>
-              )}
-            </section>
-
             {/* GST SECTION */}
             <section className="rounded-lg border border-slate-200 bg-white p-3 shadow-xs">
               <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
@@ -693,6 +671,72 @@ export default function ProductModal({isOpen, onClose, onSuccess}) {
                   />
                 </div>
               )}
+            </section>
+
+            {/* VENDOR PAYMENT */}
+            <section className="rounded-lg border border-slate-200 bg-white p-3 shadow-xs">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                <h3 className="font-bold text-slate-800">Vendor Payment</h3>
+                <div className="flex items-center gap-3 bg-slate-100 px-2.5 py-1 rounded border border-slate-200">
+                  <label className="flex items-center gap-1.5 text-[11px] font-semibold cursor-pointer text-slate-700">
+                    <input
+                      type="radio"
+                      name="paymentOptionGroup"
+                      checked={paymentOption === "PAID"}
+                      onChange={() => handlePaymentOptionChange("PAID")}
+                      className="h-3 w-3 text-emerald-600"
+                    />
+                    Paid
+                  </label>
+                  <label className="flex items-center gap-1.5 text-[11px] font-semibold cursor-pointer text-slate-700">
+                    <input
+                      type="radio"
+                      name="paymentOptionGroup"
+                      checked={paymentOption === "UNPAID"}
+                      onChange={() => handlePaymentOptionChange("UNPAID")}
+                      className="h-3 w-3 text-amber-600"
+                    />
+                    Unpaid
+                  </label>
+                </div>
+              </div>
+
+              <div className="mt-2.5 grid grid-cols-4 gap-3">
+                <PaymentSummary
+                  label="Total Bill"
+                  value={money(totalBill)}
+                />
+                <PaymentSummary
+                  label="Paid"
+                  value={money(paidAmount)}
+                />
+                <PaymentSummary
+                  label="Due"
+                  value={money(dueAmount)}
+                  danger={!isVendorBillPaid}
+                />
+                <PaymentSummary
+                  label="Status"
+                  value={isVendorBillPaid ? "Paid" : "Unpaid"}
+                  status
+                  paid={isVendorBillPaid}
+                />
+              </div>
+
+              <VendorPaymentDetails
+                option={paymentOption}
+                totalBill={totalBill}
+                advance={watchedPaid}
+                onAdvanceChange={(v) => setValue("amountPaidNow", v)}
+                method={watchedMethod}
+                onMethodChange={(v) => setValue("paymentMethod", v)}
+                reference={watchedRef}
+                onReferenceChange={(v) => setValue("transactionRef", v)}
+                inInstallments={payInInstallments}
+                onInInstallmentsChange={setPayInInstallments}
+                plan={plan}
+                onPlanChange={setPlan}
+              />
             </section>
           </form>
         </div>

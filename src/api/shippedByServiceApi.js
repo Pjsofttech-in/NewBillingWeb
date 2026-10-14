@@ -5,11 +5,6 @@ export const fetchShippedBy = async () => {
   return data;
 };
 
-export const fetchShippedById = async (id) => {
-  const {data} = await API.get(`/getShippedById/${id}`);
-  return data;
-};
-
 export const createShippedBy = async (shippedByData) => {
   const {data} = await API.post("/createShippedBy", shippedByData);
   return data;

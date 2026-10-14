@@ -5,11 +5,6 @@ export const fetchUnitTypes = async () => {
   return data;
 };
 
-export const fetchUnitTypeById = async (id) => {
-  const {data} = await API.get(`/getUnitTypeById/${id}`);
-  return data;
-};
-
 export const createUnitType = async (unitData) => {
   const {data} = await API.post("/createUnitType", unitData);
   return data;

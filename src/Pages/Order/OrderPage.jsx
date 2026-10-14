@@ -1,6 +1,11 @@
-import {useState, useCallback} from "react";
+import {useState, useCallback, useMemo} from "react";
 import {useNavigate} from "react-router-dom";
-import {useQuery, useMutation, useQueryClient} from "@tanstack/react-query";
+import {
+  useQuery,
+  useMutation,
+  useQueryClient,
+  keepPreviousData,
+} from "@tanstack/react-query";
 
 import {fetchOrders, createOrder, updateOrder, deleteOrder} from "../../api/orderApi";
 import {fetchCustomers, createCustomer} from "../../api/customerApi";
@@ -9,8 +14,14 @@ import {fetchAllProducts} from "../../api/productApi";
 import OrderList from "./OrderList";
 import CreateOrderModal from "./CreateOrderModal";
 import PaymentModal from "../Payment/PaymentModal";
+import InstallmentPlanModal from "../../Components/InstallmentPlanModal";
 import InvoiceModal from "../Payment/InvoiceModal";
 import Toast from "../../Components/Toast";
+import {
+  INITIAL_ORDER_FILTERS,
+  toOrderQuery,
+  isInvalidOrderRange,
+} from "../../utils/orderFilters";
 
 const OrderPage = () => {
   const queryClient = useQueryClient();
@@ -20,16 +31,26 @@ const OrderPage = () => {
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [isInvoiceOpen, setIsInvoiceOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [installmentOrder, setInstallmentOrder] = useState(null);
   const [editingOrder, setEditingOrder] = useState(null);
   const [toast, setToast] = useState(null);
+
+  // Search + filters live here so the list query and the PDF/CSV export use the very same values.
+  const [filters, setFilters] = useState(INITIAL_ORDER_FILTERS);
+  const orderQuery = useMemo(() => toOrderQuery(filters), [filters]);
+  const invalidRange = isInvalidOrderRange(filters);
 
   const showToast = useCallback((message, type = "success") => {
     setToast({message, type});
   }, []);
 
+  // The backend does the searching / filtering; keepPreviousData keeps the table (and the
+  // search box focus) steady while a new search is loading.
   const {data: orders = [], isLoading: loadingOrders} = useQuery({
-    queryKey: ["orders"],
-    queryFn: fetchOrders,
+    queryKey: ["orders", "list", orderQuery],
+    queryFn: () => fetchOrders(orderQuery),
+    placeholderData: keepPreviousData,
+    enabled: !invalidRange,
     retry: 1,
   });
 
@@ -144,7 +165,7 @@ const OrderPage = () => {
   };
 
   return (
-    <div className="w-full px-1 sm:px-2 py-1 space-y-1.5">
+    <div className="w-full px-1 sm:px-2 py-1 space-y-2">
       {toast && (
         <div className="relative z-100">
           <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />
@@ -152,7 +173,7 @@ const OrderPage = () => {
       )}
 
       {isProductsError && (
-        <div className="p-2.5 rounded-md border border-red-200 bg-red-50 text-xs text-red-700">
+        <div className="p-3 rounded-lg border border-red-200 bg-red-50 text-sm text-red-700">
           <strong>Backend Error:</strong> Failed to load products ({productsError?.response?.status || 500}).
         </div>
       )}
@@ -160,6 +181,9 @@ const OrderPage = () => {
       <OrderList
         orders={orders}
         isLoading={loadingOrders}
+        filters={filters}
+        onFiltersChange={setFilters}
+        onNotify={showToast}
         onOpenCreate={() => {
           setEditingOrder(null);
           setIsModalOpen(true);
@@ -167,6 +191,7 @@ const OrderPage = () => {
         onOpenEdit={handleOpenEdit}
         onDelete={handleDelete}
         onOpenPayment={handleOpenPayment}
+        onOpenInstallments={setInstallmentOrder}
         onPrintInvoice={handlePrintInvoice}
         onCreateShipment={handleCreateShipment}
       />
@@ -197,6 +222,17 @@ const OrderPage = () => {
         onSuccess={handleSuccessRefresh}
         showToast={showToast}
       />
+
+      {installmentOrder && (
+        <InstallmentPlanModal
+          kind="order"
+          referenceId={installmentOrder.id}
+          title={`Order #${installmentOrder.id}`}
+          onClose={() => setInstallmentOrder(null)}
+          onChanged={handleSuccessRefresh}
+          showToast={showToast}
+        />
+      )}
 
       <InvoiceModal
         isOpen={isInvoiceOpen}

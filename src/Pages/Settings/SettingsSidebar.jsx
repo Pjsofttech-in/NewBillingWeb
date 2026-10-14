@@ -1,5 +1,15 @@
 import {useState} from "react";
-import {Layers, Ruler, Store, Tag, Users, Building, ListChecks, Truck} from "lucide-react";
+import {
+  Layers,
+  Ruler,
+  Store,
+  Tag,
+  Users,
+  Building,
+  ListChecks,
+  Truck,
+  // Waypoints,
+} from "lucide-react";
 
 const sidebarItems = [
   {id: "vendor", label: "Add Vendor", icon: Store},
@@ -7,6 +17,7 @@ const sidebarItems = [
   {id: "BrandName", label: "Add Brand Name", icon: Tag},
   {id: "UnitType", label: "Add Unit Type", icon: Ruler},
   {id: "productType", label: "Add Product Type", icon: Layers},
+  // {id: "subCategory", label: "Sub Categories", icon: Waypoints},
   {id: "attributes", label: "Attributes", icon: ListChecks},
   {id: "shippedBy", label: "Shipped By", icon: Truck},
   {id: "storeSettings", label: "Store Settings", icon: Building},
@@ -26,7 +37,7 @@ export default function SettingsSidebar({activeTab, onSelectTab}) {
   };
 
   return (
-    <div className="group relative z-20 flex flex-col gap-1.5 w-16 hover:w-60 bg-blue-600 hover:bg-blue-700 p-3 rounded-3xl shadow-2xl transition-all duration-300 ease-in-out overflow-hidden border border-sky-400/20">
+    <div className="group relative z-20 flex flex-col gap-1.5 w-16 hover:w-60 bg-blue-500 hover:bg-blue-600 p-3 rounded-3xl shadow-2xl transition-all duration-300 ease-in-out overflow-hidden border border-sky-400/20">
       {sidebarItems.map((item) => {
         const Icon = item.icon;
         const isActive = selected === item.id;

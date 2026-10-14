@@ -1,4 +1,3 @@
-// import brandLogo from "../../assets/images/brandLogo.webp";
 
 // Logo mark shown above the access nav.
 // On hover it scales up and tilts slightly to the right.

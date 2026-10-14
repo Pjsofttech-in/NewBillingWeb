@@ -44,7 +44,7 @@ const AddShippedBy = () => {
   );
 
   // Pagination hook
-  const pagination = usePagination(filteredShippedBy, 10, searchTerm);
+  const pagination = usePagination(filteredShippedBy, 25, searchTerm);
 
   // 2. Create Mutation
   const createShippedByMutation = useMutation({
@@ -134,12 +134,12 @@ const AddShippedBy = () => {
       {/* Table */}
       <div className="overflow-x-auto rounded-xl border border-slate-200 shadow-xs">
         <table className="w-full text-left text-sm text-slate-700">
-          <thead className="bg-slate-50 text-xs uppercase text-slate-500 border-b border-slate-200">
+          <thead className="bg-slate-50 text-xs text-slate-500 border-b border-slate-200">
             <tr>
               <th className="px-4 py-3 font-semibold">S.No.</th>
               <th className="px-4 py-3 font-semibold">ID</th>
-              <th className="px-4 py-3 font-semibold">Courier / Company Name</th>
-              <th className="px-4 py-3 font-semibold">Tracking Link</th>
+              <th className="px-4 py-3 font-semibold">Courier / company name</th>
+              <th className="px-4 py-3 font-semibold">Tracking link</th>
               <th className="px-4 py-3 font-semibold text-center">Action</th>
             </tr>
           </thead>
@@ -221,12 +221,9 @@ const AddShippedBy = () => {
           currentPage={pagination.currentPage}
           totalPages={pagination.totalPages}
           totalItems={pagination.totalItems}
-          startIndex={pagination.startIndex}
-          endIndex={pagination.endIndex}
           itemsPerPage={pagination.itemsPerPage}
           onPageChange={pagination.setCurrentPage}
           onItemsPerPageChange={pagination.setItemsPerPage}
-          itemName="shipped by entries"
         />
       )}
 

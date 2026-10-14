@@ -42,7 +42,7 @@ const AddUnitType = () => {
   );
 
   // Pagination hook
-  const pagination = usePagination(filteredUnits, 10, searchTerm);
+  const pagination = usePagination(filteredUnits, 25, searchTerm);
 
   // 2. Create Mutation
   const createUnitMutation = useMutation({
@@ -132,11 +132,11 @@ const AddUnitType = () => {
       {/* Table */}
       <div className="overflow-x-auto rounded-xl border border-slate-200 shadow-xs">
         <table className="w-full text-left text-sm text-slate-700">
-          <thead className="bg-slate-50 text-xs uppercase text-slate-500 border-b border-slate-200">
+          <thead className="bg-slate-50 text-xs text-slate-500 border-b border-slate-200">
             <tr>
               <th className="px-4 py-3 font-semibold">S.No.</th>
               <th className="px-4 py-3 font-semibold">Unit ID</th>
-              <th className="px-4 py-3 font-semibold">Unit Type</th>
+              <th className="px-4 py-3 font-semibold">Unit type</th>
               <th className="px-4 py-3 font-semibold text-center">Action</th>
             </tr>
           </thead>
@@ -207,12 +207,9 @@ const AddUnitType = () => {
           currentPage={pagination.currentPage}
           totalPages={pagination.totalPages}
           totalItems={pagination.totalItems}
-          startIndex={pagination.startIndex}
-          endIndex={pagination.endIndex}
           itemsPerPage={pagination.itemsPerPage}
           onPageChange={pagination.setCurrentPage}
           onItemsPerPageChange={pagination.setItemsPerPage}
-          itemName="unit types"
         />
       )}
 

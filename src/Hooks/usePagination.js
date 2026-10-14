@@ -1,32 +1,29 @@
-import {useState, useEffect} from "react";
+import {useState} from "react";
 
 export const usePagination = (
   data = [],
-  initialItemsPerPage = 10,
+  initialItemsPerPage = 25,
   searchDependency = "",
 ) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(initialItemsPerPage);
+  const [prevSearch, setPrevSearch] = useState(searchDependency);
 
-  useEffect(() => {
+  if (prevSearch !== searchDependency) {
+    setPrevSearch(searchDependency);
     setCurrentPage(1);
-  }, [searchDependency]);
+  }
 
   const totalItems = data.length;
   const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
+  const validPage = Math.min(Math.max(1, currentPage), totalPages);
 
-  useEffect(() => {
-    if (currentPage > totalPages && totalPages > 0) {
-      setCurrentPage(totalPages);
-    }
-  }, [currentPage, totalPages]);
-
-  const startIndex = (currentPage - 1) * itemsPerPage;
+  const startIndex = (validPage - 1) * itemsPerPage;
   const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
   const paginatedData = data.slice(startIndex, startIndex + itemsPerPage);
 
   return {
-    currentPage,
+    currentPage: validPage,
     setCurrentPage,
     itemsPerPage,
     setItemsPerPage,

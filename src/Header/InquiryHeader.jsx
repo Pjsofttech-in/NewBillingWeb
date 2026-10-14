@@ -26,6 +26,12 @@ const InquiryHeader = () => {
         <NavLink to="/add" className={tabClass}>
           Product
         </NavLink>
+        <NavLink to="/vendor-bills" className={tabClass}>
+          Vendor Bills
+        </NavLink>
+        <NavLink to="/dues" className={tabClass}>
+          Dues
+        </NavLink>
         <NavLink to="/setting" className={tabClass}>
           Setting
         </NavLink>

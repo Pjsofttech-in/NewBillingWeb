@@ -1,22 +1,20 @@
 import API from "./axios";
+import {pickParams} from "../utils/queryParams";
+import {downloadFile} from "../utils/downloadFile";
+
+const PRODUCT_FILTER_KEYS = [
+  "productName",
+  "productTypeId",
+  "brandId",
+  "vendorId",
+  "unitTypeId",
+  "subCategoryId",
+];
 
 export const fetchAllProducts = async (filters = {}) => {
-  const params = new URLSearchParams();
-
-  if (filters.productName) params.append("productName", filters.productName);
-  if (filters.productTypeId)
-    params.append("productTypeId", filters.productTypeId);
-  if (filters.brandId) params.append("brandId", filters.brandId);
-  if (filters.vendorId) params.append("vendorId", filters.vendorId);
-  if (filters.unitTypeId) params.append("unitTypeId", filters.unitTypeId);
-
-  const query = params.toString();
-  const response = await API.get(`/api/products${query ? `?${query}` : ""}`);
-  return response.data;
-};
-
-export const fetchProductById = async (id) => {
-  const response = await API.get(`/api/products/${id}`);
+  const response = await API.get("/api/products", {
+    params: pickParams(filters, PRODUCT_FILTER_KEYS),
+  });
   return response.data;
 };
 
@@ -35,18 +33,6 @@ export const updateProductStock = async ({id, ...payload}) => {
   return response.data;
 };
 
-export const fetchProductsPaged = async ({
-  page = 0,
-  size = 10,
-  sortBy = "productName",
-  sortDir = "asc",
-} = {}) => {
-  const { data } = await API.get("/api/products/paged", {
-    params: { page, size, sortBy, sortDir },
-  });
-  return data;
-};
-
 export const getProductBatches = async (productId, activeOnly = false) => {
   const endpoint = activeOnly
     ? `/api/stock-batches/product/${productId}/active`
@@ -55,7 +41,27 @@ export const getProductBatches = async (productId, activeOnly = false) => {
   return response.data;
 };
 
-export const purchaseStockBatch = async (payload) => {
-  const response = await API.post("/api/stock-batches/purchase", payload);
+// Grand totals of all product columns (stock, remaining, sold, buy amount, stock amount, sold amount).
+export const fetchProductsSummary = async () => {
+  const response = await API.get("/api/products/summary");
   return response.data;
 };
+
+export const fetchProductById = async (id) => {
+  const response = await API.get(`/api/products/${id}`);
+  return response.data;
+};
+
+// Every stock movement of a product (INITIAL_STOCK, RESTOCK, ORDER_DEDUCTION, ...).
+export const fetchStockHistory = async (productId) => {
+  const response = await API.get(`/api/products/${productId}/stock-history`);
+  return response.data;
+};
+
+// Downloads the products matching `filters` (same filters as fetchAllProducts) as "pdf" or "csv".
+export const exportProducts = (format, filters = {}) =>
+  downloadFile(
+    "/api/products/export",
+    {...pickParams(filters, PRODUCT_FILTER_KEYS), format},
+    `products.${format}`,
+  );

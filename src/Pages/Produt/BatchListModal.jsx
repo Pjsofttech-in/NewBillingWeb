@@ -1,4 +1,6 @@
+import {useEffect} from "react";
 import {useQuery} from "@tanstack/react-query";
+import {X} from "lucide-react";
 import {getProductBatches} from "../../api/productApi";
 
 const BatchListModal = ({isOpen, product, onClose}) => {
@@ -12,13 +14,33 @@ const BatchListModal = ({isOpen, product, onClose}) => {
     queryFn: () => getProductBatches(product.id),
     enabled: Boolean(isOpen && product?.id),
   });
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e) => e.key === "Escape" && onClose?.();
+    document.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
-        <div className="px-5 py-4 border-b flex justify-between items-center">
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/60 backdrop-blur-sm p-0 sm:p-3"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-5xl max-h-[92vh] overflow-hidden flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="shrink-0 px-5 py-4 border-b bg-gradient-to-r from-slate-50 to-blue-50 flex justify-between items-start gap-4">
           <div>
-            <h3 className="font-bold text-lg">
+            <h3 className="font-bold text-lg text-slate-900">
               Purchase History — {product?.productName}
             </h3>
             <p className="text-xs text-slate-500">
@@ -26,17 +48,26 @@ const BatchListModal = ({isOpen, product, onClose}) => {
               vendor and prices.
             </p>
           </div>
-          <button onClick={onClose}>✕</button>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="shrink-0 h-9 w-9 flex items-center justify-center rounded-full bg-white border border-slate-200 text-slate-500 hover:bg-red-50 hover:text-red-600 hover:border-red-200 shadow-sm transition cursor-pointer"
+          >
+            <X size={18} />
+          </button>
         </div>
-        <div className="p-4 overflow-auto">
+
+        <div className="flex-1 p-4 overflow-auto">
           {isLoading ? (
             <p className="p-8 text-center">Loading batches...</p>
           ) : isError ? (
             <div className="text-center p-8">
               <p>Unable to load batches.</p>
               <button
+                type="button"
                 onClick={() => refetch()}
-                className="text-blue-600 text-sm"
+                className="mt-2 px-4 py-1.5 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition cursor-pointer"
               >
                 Retry
               </button>
@@ -50,36 +81,35 @@ const BatchListModal = ({isOpen, product, onClose}) => {
                   <th className="p-3 text-left">Batch</th>
                   <th className="p-3">Vendor</th>
                   <th className="p-3">Received</th>
-                  <th className="p-3">Initial Qty</th>
+                  <th className="p-3">Initial qty</th>
                   <th className="p-3">Available</th>
-                  <th className="p-3">Vendor MRP</th>
-                  <th className="p-3">Vendor Disc.</th>
-                  <th className="p-3">Buy Price</th>
                   <th className="p-3">Product MRP</th>
-                  <th className="p-3">Customer Price</th>
+                  <th className="p-3">Vendor disc.</th>
+                  <th className="p-3">Buy price</th>
+                  <th className="p-3">Customer price</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
                 {batches.map((b) => (
-                  <tr key={b.id}>
+                  <tr key={b.id} className="hover:bg-slate-50">
                     <td className="p-3 font-bold">{b.batchNumber}</td>
                     <td className="p-3">{b.vendor?.vendorName || "N/A"}</td>
                     <td className="p-3 text-center">{b.receivedDate || "-"}</td>
                     <td className="p-3 text-center">{b.initialQuantity}</td>
-                    <td className="p-3 text-center font-bold">
-                      {b.availableQuantity}
-                    </td>
-                    <td className="p-3 text-right">
-                      ₹{Number(b.vendorMrp || 0).toFixed(2)}
+                    <td className="p-3 text-center font-bold">{b.availableQuantity}</td>
+                    <td className="p-3 text-right font-bold text-slate-700">
+                      ₹{Number(b.productMrp || 0).toFixed(2)}
                     </td>
                     <td className="p-3 text-center">
                       {Number(b.vendorDiscountPercentage || 0).toFixed(2)}%
+                      {b.vendorDiscountAmount != null && (
+                        <span className="block text-[10px] text-slate-500">
+                          −₹{Number(b.vendorDiscountAmount).toFixed(2)}
+                        </span>
+                      )}
                     </td>
                     <td className="p-3 text-right font-bold text-blue-700">
                       ₹{Number(b.purchasePrice || 0).toFixed(2)}
-                    </td>
-                    <td className="p-3 text-right font-bold text-slate-700">
-                      ₹{Number(b.productMrp || 0).toFixed(2)}
                     </td>
                     <td className="p-3 text-right font-bold text-emerald-700">
                       ₹{Number(b.sellingPrice || 0).toFixed(2)}
@@ -90,10 +120,12 @@ const BatchListModal = ({isOpen, product, onClose}) => {
             </table>
           )}
         </div>
-        <div className="border-t px-5 py-3 flex justify-end">
+
+        <div className="shrink-0 border-t bg-slate-50 px-5 py-3 flex justify-end">
           <button
+            type="button"
             onClick={onClose}
-            className="px-4 py-2 bg-slate-100 text-slate-700 font-semibold rounded-lg text-sm hover:bg-slate-200"
+            className="h-10 px-6 rounded-xl text-sm font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-100 active:scale-95 shadow-sm transition cursor-pointer"
           >
             Close
           </button>
@@ -102,4 +134,5 @@ const BatchListModal = ({isOpen, product, onClose}) => {
     </div>
   );
 };
+
 export default BatchListModal;

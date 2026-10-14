@@ -5,11 +5,6 @@ export const fetchVendors = async () => {
   return data;
 };
 
-export const fetchVendorById = async (id) => {
-  const {data} = await API.get(`/getbyIdVendor/${id}`);
-  return data;
-};
-
 export const createVendor = async (vendorData) => {
   const {data} = await API.post("/createVendor", vendorData);
   return data;
@@ -25,8 +20,24 @@ export const deleteVendor = async (id) => {
   return data;
 };
 
+export const markVendorBillPaymentDone = async (billId) => {
+  const {data} = await API.post(`/api/vendor-bills/${billId}/mark-paid`);
+  return data;
+};
+
+// Vendor totals + all bills + installment history for one vendor
+export const fetchVendorBillDetail = async (vendorId) => {
+  const {data} = await API.get(`/api/vendor-bills/vendor/${vendorId}/detail`);
+  return data;
+};
+
 export const fetchVendorBills = async () => {
   const {data} = await API.get("/api/vendor-bills");
+  return data;
+};
+
+export const fetchVendorBillById = async (billId) => {
+  const {data} = await API.get(`/api/vendor-bills/${billId}`);
   return data;
 };
 
@@ -35,22 +46,14 @@ export const fetchVendorBillsByVendor = async (vendorId) => {
   return data;
 };
 
-export const fetchVendorBillById = async (id) => {
-  const {data} = await API.get(`/api/vendor-bills/${id}`);
-  return data;
-};
-
 export const fetchVendorBillPayments = async (billId) => {
   const {data} = await API.get(`/api/vendor-bills/${billId}/payments`);
   return data;
 };
 
-export const addVendorBillPayment = async ({billId, paymentData}) => {
-  const {data} = await API.post(`/api/vendor-bills/${billId}/payments`, paymentData);
-  return data;
-};
-
-export const markVendorBillPaymentDone = async (billId) => {
-  const {data} = await API.post(`/api/vendor-bills/${billId}/mark-paid`);
+// payload: {amountPaid, paymentMethod, transactionReference?, notes?, paymentDate?}
+// Refused by the backend while the bill has an installment plan.
+export const addVendorBillPayment = async ({billId, ...payload}) => {
+  const {data} = await API.post(`/api/vendor-bills/${billId}/payments`, payload);
   return data;
 };

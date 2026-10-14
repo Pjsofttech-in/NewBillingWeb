@@ -12,11 +12,6 @@ export const fetchProductTypes = async () => {
   return [];
 };
 
-export const fetchProductTypeById = async (id) => {
-  const {data} = await API.get(`/getProductTypeById/${id}`);
-  return data;
-};
-
 export const createProductType = async (productTypeData) => {
   const {data} = await API.post("/createProductType", productTypeData);
   return data;

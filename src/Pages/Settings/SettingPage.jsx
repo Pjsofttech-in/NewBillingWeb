@@ -7,6 +7,7 @@ import AddBrand from "./Brand/AddBrand";
 import AddVendor from "./util/AddVendor";
 import AddCustomer from "./Customer/AddCustomer";
 import StoreSettings from "./Store/StoreSettings";
+// import SubCategoryManager from "./SubCategory/SubCategoryManager";
 import AttributeManager from "./Attribute/AttributeManager";
 import AddShippedBy from "./ShippedBy/AddShippedBy";
 
@@ -34,6 +35,8 @@ const SettingPage = () => {
         {activeTab === "UnitType" && <AddUnitType />}
 
         {activeTab === "productType" && <AddProductType />}
+
+        {/* {activeTab === "subCategory" && <SubCategoryManager />} */}
 
         {activeTab === "attributes" && <AttributeManager />}
 

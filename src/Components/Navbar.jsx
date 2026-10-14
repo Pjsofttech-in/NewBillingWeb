@@ -1,6 +1,5 @@
 import {User, LogOut, UserCircle} from "lucide-react";
 import {Link, useNavigate} from "react-router-dom";
-// import logo from "../assets/images/hostellogo.png";
 import {useAuth} from "../Context/AuthContext";
 
 const Navbar = () => {

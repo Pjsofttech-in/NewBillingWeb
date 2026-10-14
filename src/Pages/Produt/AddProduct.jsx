@@ -1,36 +1,47 @@
-import {useState} from "react";
-import {useQuery} from "@tanstack/react-query";
-import {fetchAllProducts} from "../../api/productApi";
+import {useMemo, useState} from "react";
+import {useNavigate} from "react-router-dom";
+import {useQuery, keepPreviousData} from "@tanstack/react-query";
+import {PackagePlus, Plus, Receipt, X} from "lucide-react";
+import {fetchAllProducts, exportProducts} from "../../api/productApi";
 import {fetchBrands} from "../../api/brandServiceApi";
 import {fetchVendors} from "../../api/vendorServiceApi";
 import {fetchUnitTypes} from "../../api/unitTypeServiceApi";
 import {fetchProductTypes} from "../../api/productTypeServiceApi";
+import {fetchSubCategories} from "../../api/subCategoryApi";
 
 import ProductList from "./ProductList";
 import ProductModal from "./ProductModal";
 import UpdateStockModal from "./UpdateStockModal";
-import VendorBillModal from "./VendorBillModal";
 import SearchableSelect from "../../Components/Form/SearchableSelect";
+import SearchBar from "../../Components/SearchBar";
+import ExportButtons from "../../Components/ExportButtons";
 import Toast from "../../Components/Toast";
 
+const EMPTY_FILTERS = {
+  productName: "",
+  productTypeId: "",
+  subCategoryId: "",
+  brandId: "",
+  vendorId: "",
+  unitTypeId: "",
+};
+
 const AddProduct = () => {
-  const [filters, setFilters] = useState({
-    productName: "",
-    productTypeId: "",
-    brandId: "",
-    vendorId: "",
-    unitTypeId: "",
-  });
+  const navigate = useNavigate();
+  const [filters, setFilters] = useState(EMPTY_FILTERS);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isStockModalOpen, setIsStockModalOpen] = useState(false);
-  const [showVendorBills, setShowVendorBills] = useState(false);
   const [toast, setToast] = useState(null);
 
   // Fetch dropdown list options
   const {data: productTypes = []} = useQuery({
     queryKey: ["productTypes"],
     queryFn: fetchProductTypes,
+  });
+  const {data: subCategories = []} = useQuery({
+    queryKey: ["subCategories", "all"],
+    queryFn: fetchSubCategories,
   });
   const {data: brands = []} = useQuery({
     queryKey: ["brands"],
@@ -54,18 +65,43 @@ const AddProduct = () => {
   } = useQuery({
     queryKey: ["products", filters],
     queryFn: () => fetchAllProducts(filters),
+    // keep the table (and the toolbar with the search box) mounted while a new search loads
+    placeholderData: keepPreviousData,
   });
 
   const handleFilterChange = (key, value) => {
-    setFilters((prev) => ({...prev, [key]: value}));
+    setFilters((prev) => ({
+      ...prev,
+      [key]: value,
+      // a sub category belongs to one type, so drop it when the type changes
+      ...(key === "productTypeId" ? {subCategoryId: ""} : {}),
+    }));
   };
 
+  const hasActiveFilters = Object.values(filters).some(
+    (v) => v !== "" && v !== null && v !== undefined,
+  );
+
   const showToast = (message, type = "success") => setToast({message, type});
+
+  // Downloads exactly what the table shows: same filters, done by the backend.
+  const handleExport = (format) => exportProducts(format, filters);
 
   const typeOptions = productTypes.map((t) => ({
     label: t.typeName || t.name,
     value: t.id,
   }));
+  const subCategoryOptions = useMemo(
+    () =>
+      subCategories
+        .filter(
+          (sc) =>
+            !filters.productTypeId ||
+            String(sc.productType?.id) === String(filters.productTypeId),
+        )
+        .map((sc) => ({label: sc.subCategoryName, value: sc.id})),
+    [subCategories, filters.productTypeId],
+  );
   const brandOptions = brands.map((b) => ({
     label: b.brandName || b.name,
     value: b.id,
@@ -79,8 +115,129 @@ const AddProduct = () => {
     value: u.id,
   }));
 
+  // Order inside toolbar: 1) filters  2) total count + action buttons
+  const toolbar = (
+    <div className="w-full bg-white p-3 rounded-xl border border-slate-200 shadow-sm space-y-3">
+      {/* ============ 1) FILTERS ============ */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-2">
+        <SearchBar
+          value={filters.productName}
+          onChange={(text) => handleFilterChange("productName", text)}
+          placeholder="Search product..."
+          ariaLabel="Search products"
+          size="md"
+        />
+
+        <SearchableSelect
+          placeholder="All Types"
+          allLabel="All Types"
+          options={typeOptions}
+          value={filters.productTypeId}
+          onChange={(val) => handleFilterChange("productTypeId", val)}
+        />
+
+        {filters.productTypeId && (
+          <SearchableSelect
+            placeholder="All Sub Categories"
+            allLabel="All Sub Categories"
+            options={subCategoryOptions}
+            value={filters.subCategoryId}
+            onChange={(val) => handleFilterChange("subCategoryId", val)}
+          />
+        )}
+
+        <SearchableSelect
+          placeholder="All Brands"
+          allLabel="All Brands"
+          options={brandOptions}
+          value={filters.brandId}
+          onChange={(val) => handleFilterChange("brandId", val)}
+        />
+
+        <SearchableSelect
+          placeholder="All Vendors"
+          allLabel="All Vendors"
+          options={vendorOptions}
+          value={filters.vendorId}
+          onChange={(val) => handleFilterChange("vendorId", val)}
+        />
+
+        <SearchableSelect
+          placeholder="All Units"
+          allLabel="All Units"
+          options={unitOptions}
+          value={filters.unitTypeId}
+          onChange={(val) => handleFilterChange("unitTypeId", val)}
+        />
+      </div>
+
+      {/* ============ 2) TOTAL COUNT + ACTION BUTTONS (below filters) ============ */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-3 border-t border-slate-100">
+        {/* Left: total count + clear filters */}
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 px-3 py-1.5 rounded-full text-xs font-bold border border-blue-100">
+            Total products
+            <span className="bg-blue-600 text-white rounded-full px-2 py-1 text-[11px] leading-none">
+              {products.length}
+            </span>
+          </span>
+
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={() => setFilters(EMPTY_FILTERS)}
+              className="inline-flex items-center gap-1 h-8 px-2.5 rounded-lg text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-red-50 hover:text-red-600 transition cursor-pointer"
+            >
+              <X size={14} />
+              Clear
+            </button>
+          )}
+        </div>
+
+        {/* Right: action buttons */}
+        <div className="grid grid-cols-3 sm:flex sm:flex-wrap items-center gap-2 w-full sm:w-auto">
+          <ExportButtons
+            className="col-span-3 sm:col-span-1"
+            itemName="products"
+            filtered={hasActiveFilters}
+            disabled={isLoading || products.length === 0}
+            onExport={handleExport}
+            onError={(message) => showToast(message, "error")}
+          />
+
+          <button
+            type="button"
+            onClick={() => setIsStockModalOpen(true)}
+            className="h-9 px-3.5 rounded-lg text-sm font-semibold text-white bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 shadow-sm hover:shadow-md active:scale-95 transition flex items-center justify-center gap-1.5 cursor-pointer"
+          >
+            <PackagePlus size={16} />
+            <span className="truncate">Update stock</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsModalOpen(true)}
+            className="h-9 px-3.5 rounded-lg text-sm font-semibold text-white bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 shadow-sm hover:shadow-md active:scale-95 transition flex items-center justify-center gap-1.5 cursor-pointer"
+          >
+            <Plus size={16} />
+            <span className="truncate">Add Product</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => navigate("/vendor-bills")}
+            className="h-9 px-3.5 rounded-lg text-sm font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 hover:border-slate-400 shadow-sm active:scale-95 transition flex items-center justify-center gap-1.5 cursor-pointer"
+          >
+            <Receipt size={16} />
+            <span className="truncate">Vendor bills</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
-    <div className="w-full px-1 sm:px-2 py-1 space-y-1.5">
+    <div className="w-full px-1 sm:px-2 py-1 space-y-3">
       {toast && (
         <Toast
           message={toast.message}
@@ -88,107 +245,6 @@ const AddProduct = () => {
           onClose={() => setToast(null)}
         />
       )}
-
-      {/* Integrated Filter & Actions Header */}
-      <div className="w-full bg-white p-2.5 rounded-lg border border-slate-200 shadow-xs space-y-2">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-slate-100 pb-2">
-          {/* Left: Title */}
-          <div className="flex items-center gap-2">
-            {/* <span className="text-sm font-bold text-slate-800">
-              Filter Products
-            </span> */}
-            {/* <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded text-[11px] font-semibold border border-blue-100">
-              Total: {products.length}
-            </span> */}
-          </div>
-
-          {/* Right: Action Buttons */}
-          <div className="flex items-center gap-1.5 w-full sm:w-auto">
-            <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded text-[11px] font-semibold border border-blue-100">
-              Total: {products.length}
-            </span>
-            <button
-              onClick={() => setIsStockModalOpen(true)}
-              className="flex-1 sm:flex-none px-2.5 py-1 bg-emerald-600 text-white font-semibold rounded text-xs hover:bg-emerald-700 transition shadow-xs flex items-center justify-center gap-1 cursor-pointer"
-            >
-              <span>+</span> Update Stock
-            </button>
-
-            <button
-              onClick={() => setIsModalOpen(true)}
-              className="flex-1 sm:flex-none px-2.5 py-1 bg-blue-600 text-white font-semibold rounded text-xs hover:bg-blue-700 transition shadow-xs flex items-center justify-center gap-1 cursor-pointer"
-            >
-              <span>+</span> Add Product
-            </button>
-
-            <button
-              onClick={() => setShowVendorBills(true)}
-              className="flex-1 sm:flex-none px-2.5 py-1 bg-slate-100 text-slate-700 font-semibold rounded text-xs hover:bg-slate-200 transition shadow-xs flex items-center justify-center gap-1 cursor-pointer border border-slate-200"
-            >
-              Vendor Bills
-            </button>
-          </div>
-        </div>
-
-        {/* Filter Inputs Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
-          {/* Product Name Search */}
-          <div>
-            {/* <label className="block text-[12px] font-semibold text-slate-600 mb-0.5">
-              Product Name
-            </label> */}
-            <input
-              type="text"
-              placeholder="Search product..."
-              value={filters.productName}
-              onChange={(e) =>
-                handleFilterChange("productName", e.target.value)
-              }
-              className="w-full px-2.5 py-2 border rounded text-xs outline-none focus:ring-1 focus:ring-blue-500 border-slate-300 transition"
-            />
-          </div>
-
-          {/* Product Type Searchable Dropdown */}
-          <SearchableSelect
-            // label="Product Type"
-            placeholder="All Types"
-            allLabel="All Types"
-            options={typeOptions}
-            value={filters.productTypeId}
-            onChange={(val) => handleFilterChange("productTypeId", val)}
-          />
-
-          {/* Brand Searchable Dropdown */}
-          <SearchableSelect
-            // label="Brand"
-            placeholder="All Brands"
-            allLabel="All Brands"
-            options={brandOptions}
-            value={filters.brandId}
-            onChange={(val) => handleFilterChange("brandId", val)}
-          />
-
-          {/* Vendor Searchable Dropdown */}
-          <SearchableSelect
-            // label="Vendor"
-            placeholder="All Vendors"
-            allLabel="All Vendors"
-            options={vendorOptions}
-            value={filters.vendorId}
-            onChange={(val) => handleFilterChange("vendorId", val)}
-          />
-
-          {/* Unit Type Searchable Dropdown */}
-          <SearchableSelect
-            // label="Unit Type"
-            placeholder="All Units"
-            allLabel="All Units"
-            options={unitOptions}
-            value={filters.unitTypeId}
-            onChange={(val) => handleFilterChange("unitTypeId", val)}
-          />
-        </div>
-      </div>
 
       {/* Product Table View */}
       <div className="w-full">
@@ -210,26 +266,40 @@ const AddProduct = () => {
           </div>
         )}
 
-        {!isLoading && !isError && <ProductList products={products} />}
+        {!isLoading && !isError && (
+          <ProductList
+            products={products}
+            toolbar={toolbar}
+          />
+        )}
       </div>
 
       {/* Modals */}
       <ProductModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        onSuccess={() => showToast("Product created successfully!", "success")}
+        onSuccess={(planError) =>
+          planError
+            ? showToast(
+                `Product created, but the installment plan failed: ${planError}. Create it from Vendor Bills.`,
+                "error",
+              )
+            : showToast("Product created successfully!", "success")
+        }
       />
 
       <UpdateStockModal
         isOpen={isStockModalOpen}
         productsList={products}
         onClose={() => setIsStockModalOpen(false)}
-        onSuccess={() => showToast("Stock updated successfully!", "success")}
-      />
-
-      <VendorBillModal
-        isOpen={showVendorBills}
-        onClose={() => setShowVendorBills(false)}
+        onSuccess={(updated, planError) =>
+          planError
+            ? showToast(
+                `Stock updated, but the installment plan failed: ${planError}. Create it from Vendor Bills.`,
+                "error",
+              )
+            : showToast("Stock updated successfully!", "success")
+        }
       />
     </div>
   );

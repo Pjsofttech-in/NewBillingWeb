@@ -1,8 +1,20 @@
-import {useEffect, useMemo, useState} from "react";
+import {useMemo, useState} from "react";
 import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
 import {fetchVendors} from "../../api/vendorServiceApi";
 import {updateProductStock} from "../../api/productApi";
 import SearchableSelect from "../../Components/Form/SearchableSelect";
+import VendorDiscountFields from "../../Components/Form/VendorDiscountFields";
+import VendorPaymentDetails, {
+  EMPTY_PLAN,
+  createPlanForNewBill,
+  planFirstDate,
+  validatePlan,
+} from "../../Components/Form/VendorPaymentDetails";
+import {
+  resolveVendorPricing,
+  valueForMode,
+  vendorPricingFields,
+} from "../../utils/vendorPricing";
 
 const money = (v) =>
   `₹${Number(v || 0).toLocaleString("en-IN", {
@@ -21,8 +33,8 @@ const UpdateStockModal = ({
   const [selectedProductId, setSelectedProductId] = useState("");
   const [addedQuantity, setAddedQuantity] = useState("");
   const [selectedVendorId, setSelectedVendorId] = useState("");
-  const [mrp, setMrp] = useState("");
-  const [vendorDiscountPercentage, setVendorDiscountPercentage] = useState("");
+  const [discountMode, setDiscountMode] = useState("PERCENT");
+  const [discountValue, setDiscountValue] = useState("");
   const [productMrp, setProductMrp] = useState("");
   const [customerPrice, setCustomerPrice] = useState("");
   const [batchNumber, setBatchNumber] = useState("");
@@ -30,12 +42,12 @@ const UpdateStockModal = ({
     new Date().toISOString().slice(0, 10),
   );
 
-  const [paymentOption, setPaymentOption] = useState("PENDING");
-  const [dueDate, setDueDate] = useState("");
+  const [paymentOption, setPaymentOption] = useState("UNPAID"); // PAID | UNPAID
+  const [payInInstallments, setPayInInstallments] = useState(false);
+  const [plan, setPlan] = useState(EMPTY_PLAN);
   const [amountPaidNow, setAmountPaidNow] = useState("0");
   const [paymentMethod, setPaymentMethod] = useState("CASH");
   const [transactionRef, setTransactionRef] = useState("");
-  const [remarks, setRemarks] = useState("");
   const [error, setError] = useState("");
 
   const activeProduct =
@@ -47,64 +59,82 @@ const UpdateStockModal = ({
     enabled: isOpen,
   });
 
-  useEffect(() => {
-    if (!isOpen) return;
-    const p = product || activeProduct;
-    if (p) {
-      setSelectedProductId(String(p.id));
-      setSelectedVendorId(p.vendor?.id ? String(p.vendor.id) : "");
-      setMrp(p.mrp ?? "");
-      setVendorDiscountPercentage(p.vendorDiscountPercentage ?? "");
-      setCustomerPrice(p.customerPrice ?? "");
-      setProductMrp(p.productMrp ?? "");
+  const [prevModalProductKey, setPrevModalProductKey] = useState(null);
+  const currentModalProductKey = isOpen ? product?.id || "open" : null;
+  if (prevModalProductKey !== currentModalProductKey) {
+    setPrevModalProductKey(currentModalProductKey);
+    if (isOpen) {
+      const p = product;
+      if (p) {
+        setSelectedProductId(String(p.id));
+        setSelectedVendorId(p.vendor?.id ? String(p.vendor.id) : "");
+        setDiscountMode("PERCENT");
+        setDiscountValue(p.vendorDiscountPercentage ?? "");
+        setCustomerPrice(p.customerPrice ?? "");
+        setProductMrp(p.productMrp ?? "");
+      }
+      setReceivedDate(new Date().toISOString().slice(0, 10));
     }
-    setReceivedDate(new Date().toISOString().slice(0, 10));
-  }, [isOpen, product]);
+  }
 
-  const storePrice = useMemo(() => {
-    const mrpNum = Number(mrp) || 0;
-    const discountNum = Math.max(
-      0,
-      Math.min(100, Number(vendorDiscountPercentage) || 0),
-    );
-    const calculated = mrpNum - (mrpNum * discountNum) / 100;
-    return Math.max(0, Number(calculated.toFixed(2)));
-  }, [mrp, vendorDiscountPercentage]);
+  // Vendor pricing is on the ACTUAL Product MRP: flat price (₹) OR discount %, the other is calculated.
+  const pricing = useMemo(
+    () =>
+      resolveVendorPricing({
+        productMrp,
+        mode: discountMode,
+        value: discountValue,
+      }),
+    [productMrp, discountMode, discountValue],
+  );
+  const storePrice = pricing.purchasePrice;
+
+  const handleDiscountModeChange = (mode) => {
+    if (mode === discountMode) return;
+    setDiscountValue(valueForMode(mode, pricing));
+    setDiscountMode(mode);
+  };
 
   const qty = Math.max(0, Number.parseInt(addedQuantity, 10) || 0);
   const totalBill = storePrice * qty;
-  const paidAmount = Math.max(0, Number(amountPaidNow) || 0);
+  const paidAmount =
+    paymentOption === "PAID"
+      ? totalBill
+      : Math.max(0, Number(amountPaidNow) || 0);
   const dueAmount = Math.max(0, totalBill - paidAmount);
   const isVendorBillPaid = totalBill > 0 && paidAmount >= totalBill - 0.009;
 
   const handlePaymentOptionChange = (option) => {
     setPaymentOption(option);
     if (option === "PAID") {
-      setAmountPaidNow(totalBill.toString());
-      setDueDate("");
+      setPayInInstallments(false);
     } else {
       setAmountPaidNow("0");
     }
   };
 
-  useEffect(() => {
-    if (paymentOption === "PAID") {
-      setAmountPaidNow(totalBill.toString());
-    }
-  }, [totalBill, paymentOption]);
-
   const updateMutation = useMutation({
-    mutationFn: (payload) =>
-      updateProductStock({id: activeProduct.id, ...payload}),
-    onSuccess: async (updated) => {
+    mutationFn: async ({installmentPlan, ...payload}) => {
+      const updated = await updateProductStock({
+        id: activeProduct.id,
+        ...payload,
+      });
+      // the stock purchase created the vendor bill; put it on the plan
+      const planError = installmentPlan
+        ? await createPlanForNewBill(payload.vendorId, installmentPlan)
+        : null;
+      return {updated, planError};
+    },
+    onSuccess: async ({updated, planError}) => {
       await Promise.all([
         queryClient.invalidateQueries({queryKey: ["products"]}),
         queryClient.invalidateQueries({
           queryKey: ["productBatches", activeProduct.id],
         }),
         queryClient.invalidateQueries({queryKey: ["vendorBills"]}),
+        queryClient.invalidateQueries({queryKey: ["dashboard"]}),
       ]);
-      onSuccess?.(updated);
+      onSuccess?.(updated, planError);
       handleClose();
     },
     onError: (err) =>
@@ -116,11 +146,13 @@ const UpdateStockModal = ({
     setAddedQuantity("");
     setBatchNumber("");
     setProductMrp("");
+    setDiscountMode("PERCENT");
+    setDiscountValue("");
     setAmountPaidNow("0");
     setTransactionRef("");
-    setRemarks("");
-    setDueDate("");
-    setPaymentOption("PENDING");
+    setPaymentOption("UNPAID");
+    setPayInInstallments(false);
+    setPlan(EMPTY_PLAN);
     setError("");
     onClose();
   };
@@ -153,34 +185,35 @@ const UpdateStockModal = ({
     if (qty <= 0) return setError("Quantity must be greater than 0");
     if (!selectedVendorId)
       return setError("Please select the vendor for this stock batch");
-    if (Number(mrp) <= 0) return setError("Vendor MRP is required");
-    if (Number(productMrp) < 0)
-      return setError("Actual product MRP cannot be negative");
+    if (Number(productMrp) <= 0)
+      return setError("Actual product MRP must be greater than 0");
+    if (pricing.error) return setError(pricing.error);
     if (Number(customerPrice) < 0)
       return setError("Customer price cannot be negative");
     if (paidAmount > totalBill + 0.009)
       return setError("Paid amount cannot be greater than the vendor bill");
 
+    const useInstallments = paymentOption === "UNPAID" && payInInstallments;
+    if (useInstallments) {
+      const planProblem = validatePlan(plan, totalBill - paidAmount);
+      if (planProblem) return setError(planProblem);
+    }
+
     updateMutation.mutate({
       addedQuantity: qty,
       vendorId: Number(selectedVendorId),
-      mrp: Number(mrp),
-      vendorDiscountPercentage: Number(vendorDiscountPercentage) || 0,
-      storePrice: storePrice,
-      productMrp:
-        productMrp === ""
-          ? Number(activeProduct?.productMrp || 0)
-          : Number(productMrp),
+      ...vendorPricingFields(discountMode, discountValue),
+      productMrp: Number(productMrp),
       customerPrice: customerPrice === "" ? storePrice : Number(customerPrice),
       batchNumber: batchNumber.trim() || null,
       receivedDate: receivedDate || null,
-      dueDate: dueDate || null,
-      purchasePrice: storePrice,
+      dueDate: useInstallments ? planFirstDate(plan) || null : null,
       sellingPrice: customerPrice === "" ? storePrice : Number(customerPrice),
       amountPaidNow: paidAmount,
       paymentMethod: paidAmount > 0 ? paymentMethod : null,
       transactionRef: transactionRef || null,
-      remarks: remarks || "Restocked via UI",
+      remarks: "Restocked via UI",
+      installmentPlan: useInstallments ? plan : null,
     });
   };
 
@@ -248,14 +281,9 @@ const UpdateStockModal = ({
                     </span>
                     <strong className="text-slate-800">
                       {money(activeProduct.storePrice)}
-                    </strong>
-                  </div>
-                  <div>
-                    <span className="block text-[10px] font-semibold text-slate-400 uppercase">
-                      Current Vendor MRP
-                    </span>
-                    <strong className="text-slate-800">
-                      {money(activeProduct.mrp)}
+                      <span className="ml-1 text-[10px] font-semibold text-emerald-600">
+                        ({activeProduct.vendorDiscountPercentage ?? 0}% off)
+                      </span>
                     </strong>
                   </div>
                   <div>
@@ -300,36 +328,24 @@ const UpdateStockModal = ({
                     options={vendorOptions}
                     value={selectedVendorId}
                     onChange={setSelectedVendorId}
-                    placeholder={
-                      loadingVendors ? "..." : "Select vendor"
-                    }
+                    placeholder={loadingVendors ? "..." : "Select vendor"}
                   />
                 </div>
                 <Field
                   label="Actual Product MRP"
+                  required
                   type="number"
                   min="0"
                   step="0.01"
                   value={productMrp}
                   onChange={setProductMrp}
                 />
-                <Field
-                  label="Vendor MRP"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={mrp}
-                  onChange={setMrp}
-                  required
-                />
-                <Field
-                  label="Vendor Disc %"
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="0.01"
-                  value={vendorDiscountPercentage}
-                  onChange={setVendorDiscountPercentage}
+                <VendorDiscountFields
+                  mode={discountMode}
+                  value={discountValue}
+                  onModeChange={handleDiscountModeChange}
+                  onValueChange={setDiscountValue}
+                  resolved={pricing}
                 />
                 <PriceDisplay
                   label="Purchase Price"
@@ -378,11 +394,11 @@ const UpdateStockModal = ({
                     <input
                       type="radio"
                       name="paymentOptionGroup"
-                      checked={paymentOption === "PENDING"}
-                      onChange={() => handlePaymentOptionChange("PENDING")}
+                      checked={paymentOption === "UNPAID"}
+                      onChange={() => handlePaymentOptionChange("UNPAID")}
                       className="h-3 w-3 text-amber-600"
                     />
-                    Pending
+                    Unpaid
                   </label>
                 </div>
               </div>
@@ -403,68 +419,25 @@ const UpdateStockModal = ({
                 />
                 <PaymentSummary
                   label="Status"
-                  value={isVendorBillPaid ? "Paid" : "Pending"}
+                  value={isVendorBillPaid ? "Paid" : "Unpaid"}
                   status
                   paid={isVendorBillPaid}
                 />
               </div>
 
-              {paymentOption === "PENDING" && (
-                <div className="mt-2.5 rounded border border-amber-200 bg-amber-50/40 p-2.5">
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 items-start">
-                    <Field
-                      label="Amount Paid Now"
-                      type="number"
-                      min="0"
-                      max={totalBill}
-                      step="0.01"
-                      value={amountPaidNow}
-                      onChange={setAmountPaidNow}
-                    />
-                    <Field
-                      label="Due Date"
-                      type="date"
-                      value={dueDate}
-                      onChange={setDueDate}
-                    />
-                    <div className="flex flex-col">
-                      <label className="mb-1 block text-xs font-semibold text-slate-700">
-                        Payment Method
-                      </label>
-                      <select
-                        value={paymentMethod}
-                        onChange={(e) => setPaymentMethod(e.target.value)}
-                        className="h-8 w-full rounded border border-slate-300 bg-white px-2 text-xs outline-none focus:border-blue-500"
-                      >
-                        <option value="CASH">Cash</option>
-                        <option value="UPI">UPI</option>
-                        <option value="CREDIT_CARD">Credit Card</option>
-                        <option value="DEBIT_CARD">Debit Card</option>
-                        <option value="NET_BANKING">Net Banking</option>
-                      </select>
-                    </div>
-                    <Field
-                      label="Ref / Transaction No."
-                      value={transactionRef}
-                      onChange={setTransactionRef}
-                      placeholder="UPI/Bank ref"
-                    />
-                  </div>
-                </div>
-              )}
-            </section>
-
-            {/* REMARKS */}
-            <section className="rounded-lg border border-slate-200 bg-white p-3 shadow-xs">
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Remarks
-              </label>
-              <textarea
-                value={remarks}
-                onChange={(e) => setRemarks(e.target.value)}
-                rows="2"
-                placeholder="Optional notes..."
-                className="w-full rounded border border-slate-300 p-2 text-xs outline-none focus:border-blue-500"
+              <VendorPaymentDetails
+                option={paymentOption}
+                totalBill={totalBill}
+                advance={amountPaidNow}
+                onAdvanceChange={setAmountPaidNow}
+                method={paymentMethod}
+                onMethodChange={setPaymentMethod}
+                reference={transactionRef}
+                onReferenceChange={setTransactionRef}
+                inInstallments={payInInstallments}
+                onInInstallmentsChange={setPayInInstallments}
+                plan={plan}
+                onPlanChange={setPlan}
               />
             </section>
           </form>

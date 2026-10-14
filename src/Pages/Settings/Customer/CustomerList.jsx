@@ -81,11 +81,11 @@ const CustomerList = ({
       {/* Table Section */}
       <div className="overflow-x-auto bg-white rounded-xl shadow-sm border border-slate-200">
         <table className="w-full text-left text-sm text-slate-600">
-          <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 font-semibold uppercase text-xs">
+          <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 font-semibold text-xs">
             <tr>
               <th className="px-4 py-3.5">ID</th>
-              <th className="px-4 py-3.5">Customer Name</th>
-              <th className="px-4 py-3.5">Contact Details</th>
+              <th className="px-4 py-3.5">Customer name</th>
+              <th className="px-4 py-3.5">Contact details</th>
               <th className="px-4 py-3.5">Location</th>
               <th className="px-4 py-3.5 text-right">Actions</th>
             </tr>

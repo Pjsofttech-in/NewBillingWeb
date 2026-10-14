@@ -1,3 +1,4 @@
+import {Suspense} from "react";
 import {Outlet, useLocation} from "react-router-dom";
 import Navbar from "../Components/Navbar";
 import Sidebar from "../Components/Sidebar";
@@ -21,7 +22,15 @@ const InquiryLayout = () => {
           {!isProfilePage && <InquiryHeader />}
 
           <main className="flex-1 p-2 sm:p-4 w-full">
-            <Outlet />
+            <Suspense
+              fallback={
+                <div className="flex items-center justify-center py-16">
+                  <div className="h-6 w-6 animate-spin rounded-full border-b-2 border-blue-600" />
+                </div>
+              }
+            >
+              <Outlet />
+            </Suspense>
           </main>
           <Footer />
         </div>

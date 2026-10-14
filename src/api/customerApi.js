@@ -5,11 +5,6 @@ export const fetchCustomers = async () => {
   return response.data;
 };
 
-export const fetchCustomerById = async (id) => {
-  const response = await API.get(`/getCustomerById/${id}`);
-  return response.data;
-};
-
 export const createCustomer = async (customerData) => {
   const response = await API.post("/createCustomer", customerData);
   return response.data;

@@ -50,7 +50,7 @@ const AddVendor = () => {
   });
 
   // Pagination hook
-  const pagination = usePagination(filteredVendors, 10, searchTerm);
+  const pagination = usePagination(filteredVendors, 25, searchTerm);
 
   // 2. Create Vendor Mutation
   const createVendorMutation = useMutation({
@@ -181,12 +181,12 @@ const AddVendor = () => {
       {/* Vendor Table */}
       <div className="overflow-x-auto rounded-xl border border-slate-200 shadow-xs">
         <table className="w-full text-left text-sm text-slate-700">
-          <thead className="bg-slate-50 text-xs uppercase text-slate-500 border-b border-slate-200">
+          <thead className="bg-slate-50 text-xs text-slate-500 border-b border-slate-200">
             <tr>
               <th className="px-4 py-3 font-semibold">S.No.</th>
-              <th className="px-4 py-3 font-semibold">Vendor Name</th>
-              <th className="px-4 py-3 font-semibold">Company Name</th>
-              <th className="px-4 py-3 font-semibold">Contact Info</th>
+              <th className="px-4 py-3 font-semibold">Vendor name</th>
+              <th className="px-4 py-3 font-semibold">Company name</th>
+              <th className="px-4 py-3 font-semibold">Contact info</th>
               <th className="px-4 py-3 font-semibold">Location</th>
               <th className="px-4 py-3 font-semibold text-center">Actions</th>
             </tr>
@@ -278,12 +278,9 @@ const AddVendor = () => {
           currentPage={pagination.currentPage}
           totalPages={pagination.totalPages}
           totalItems={pagination.totalItems}
-          startIndex={pagination.startIndex}
-          endIndex={pagination.endIndex}
           itemsPerPage={pagination.itemsPerPage}
           onPageChange={pagination.setCurrentPage}
           onItemsPerPageChange={pagination.setItemsPerPage}
-          itemName="vendors"
         />
       )}
 
