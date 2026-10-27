@@ -7,7 +7,7 @@ import {orderInstallmentApi} from "../../api/installmentApi";
 import DeleteConfirmModal from "../../Components/DeleteConfirmModal";
 import StatCard from "./StatCard";
 import Pagination from "../../Components/Pagination";
-import {usePagination} from "../../hooks/usePagination";
+import {usePagination} from "../../Hooks/usePagination";
 import Input from "../../Components/Form/Input";
 import Select from "../../Components/Form/Select";
 import SearchBar from "../../Components/SearchBar";

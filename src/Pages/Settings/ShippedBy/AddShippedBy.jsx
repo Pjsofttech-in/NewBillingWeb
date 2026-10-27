@@ -11,7 +11,7 @@ import Toast from "../../../Components/Toast";
 import ShippedByModal from "./ShippedByModal";
 import Pagination from "../../../Components/Pagination";
 import DeleteConfirmModal from "../../../Components/DeleteConfirmModal";
-import {usePagination} from "../../../hooks/usePagination";
+import {usePagination} from "../../../Hooks/usePagination";
 
 const AddShippedBy = () => {
   const [searchTerm, setSearchTerm] = useState("");

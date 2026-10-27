@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import PortalGrid from "./PortalGrid";
-import AccessNav from "./AccessNav";
-import BrandMark from "./BrandMark";
+import PortalGrid from "./Portalgrid";
+import AccessNav from "./Accessnav";
+import BrandMark from "./Brandmark";
 import LoginPanel from "./Loginpanel";
 import { authTabs } from "../../data/AuthTabs";
 import { useNavigate } from "react-router-dom";

@@ -23,7 +23,7 @@ import {
 import {shipmentDateRange, toShipmentQuery} from "../../utils/shipmentFilters";
 import DeleteConfirmModal from "../../Components/DeleteConfirmModal";
 import Pagination from "../../Components/Pagination";
-import {usePagination} from "../../hooks/usePagination";
+import {usePagination} from "../../Hooks/usePagination";
 import {inr} from "../../utils/vendorPricing";
 
 // Badge colour + the dot in front of the text.
