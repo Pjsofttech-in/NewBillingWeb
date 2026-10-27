@@ -4,23 +4,14 @@ import {fetchVendors} from "../../api/vendorServiceApi";
 import {updateProductStock} from "../../api/productApi";
 import SearchableSelect from "../../Components/Form/SearchableSelect";
 import VendorDiscountFields from "../../Components/Form/VendorDiscountFields";
-import VendorPaymentDetails, {
-  EMPTY_PLAN,
-  createPlanForNewBill,
-  planFirstDate,
-  validatePlan,
-} from "../../Components/Form/VendorPaymentDetails";
+import VendorPaymentSection from "../../Components/Form/VendorPaymentSection";
 import {
   resolveVendorPricing,
   valueForMode,
   vendorPricingFields,
 } from "../../utils/vendorPricing";
+import {money} from "../../utils/format";
 
-const money = (v) =>
-  `₹${Number(v || 0).toLocaleString("en-IN", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
 
 const UpdateStockModal = ({
   isOpen,
@@ -42,10 +33,8 @@ const UpdateStockModal = ({
     new Date().toISOString().slice(0, 10),
   );
 
-  const [paymentOption, setPaymentOption] = useState("UNPAID"); // PAID | UNPAID
-  const [payInInstallments, setPayInInstallments] = useState(false);
-  const [plan, setPlan] = useState(EMPTY_PLAN);
-  const [amountPaidNow, setAmountPaidNow] = useState("0");
+  // COMPLETE: bill paid now | INSTALLMENT: unpaid, plan is created in Vendor Bills
+  const [paymentOption, setPaymentOption] = useState("INSTALLMENT");
   const [paymentMethod, setPaymentMethod] = useState("CASH");
   const [transactionRef, setTransactionRef] = useState("");
   const [error, setError] = useState("");
@@ -77,7 +66,7 @@ const UpdateStockModal = ({
     }
   }
 
-  // Vendor pricing is on the ACTUAL Product MRP: flat price (₹) OR discount %, the other is calculated.
+  // Vendor pricing is on the ACTUAL Product MRP: flat price () OR discount %, the other is calculated.
   const pricing = useMemo(
     () =>
       resolveVendorPricing({
@@ -97,35 +86,27 @@ const UpdateStockModal = ({
 
   const qty = Math.max(0, Number.parseInt(addedQuantity, 10) || 0);
   const totalBill = storePrice * qty;
-  const paidAmount =
-    paymentOption === "PAID"
-      ? totalBill
-      : Math.max(0, Number(amountPaidNow) || 0);
+  const paidAmount = paymentOption === "COMPLETE" ? totalBill : 0;
   const dueAmount = Math.max(0, totalBill - paidAmount);
   const isVendorBillPaid = totalBill > 0 && paidAmount >= totalBill - 0.009;
 
   const handlePaymentOptionChange = (option) => {
     setPaymentOption(option);
-    if (option === "PAID") {
-      setPayInInstallments(false);
-    } else {
-      setAmountPaidNow("0");
+    if (option !== "COMPLETE") {
+      setPaymentMethod("CASH");
+      setTransactionRef("");
     }
   };
 
   const updateMutation = useMutation({
-    mutationFn: async ({installmentPlan, ...payload}) => {
+    mutationFn: async (payload) => {
       const updated = await updateProductStock({
         id: activeProduct.id,
         ...payload,
       });
-      // the stock purchase created the vendor bill; put it on the plan
-      const planError = installmentPlan
-        ? await createPlanForNewBill(payload.vendorId, installmentPlan)
-        : null;
-      return {updated, planError};
+      return {updated};
     },
-    onSuccess: async ({updated, planError}) => {
+    onSuccess: async ({updated}) => {
       await Promise.all([
         queryClient.invalidateQueries({queryKey: ["products"]}),
         queryClient.invalidateQueries({
@@ -134,7 +115,7 @@ const UpdateStockModal = ({
         queryClient.invalidateQueries({queryKey: ["vendorBills"]}),
         queryClient.invalidateQueries({queryKey: ["dashboard"]}),
       ]);
-      onSuccess?.(updated, planError);
+      onSuccess?.(updated);
       handleClose();
     },
     onError: (err) =>
@@ -148,11 +129,9 @@ const UpdateStockModal = ({
     setProductMrp("");
     setDiscountMode("PERCENT");
     setDiscountValue("");
-    setAmountPaidNow("0");
+    setPaymentMethod("CASH");
     setTransactionRef("");
-    setPaymentOption("UNPAID");
-    setPayInInstallments(false);
-    setPlan(EMPTY_PLAN);
+    setPaymentOption("INSTALLMENT");
     setError("");
     onClose();
   };
@@ -190,14 +169,8 @@ const UpdateStockModal = ({
     if (pricing.error) return setError(pricing.error);
     if (Number(customerPrice) < 0)
       return setError("Customer price cannot be negative");
-    if (paidAmount > totalBill + 0.009)
-      return setError("Paid amount cannot be greater than the vendor bill");
-
-    const useInstallments = paymentOption === "UNPAID" && payInInstallments;
-    if (useInstallments) {
-      const planProblem = validatePlan(plan, totalBill - paidAmount);
-      if (planProblem) return setError(planProblem);
-    }
+    if (paymentOption === "COMPLETE" && !paymentMethod)
+      return setError("Select the payment method");
 
     updateMutation.mutate({
       addedQuantity: qty,
@@ -207,13 +180,18 @@ const UpdateStockModal = ({
       customerPrice: customerPrice === "" ? storePrice : Number(customerPrice),
       batchNumber: batchNumber.trim() || null,
       receivedDate: receivedDate || null,
-      dueDate: useInstallments ? planFirstDate(plan) || null : null,
+      dueDate: null,
+      // saved on the vendor bill: the bill list then shows "Installment"
+      installmentRequested: paymentOption !== "COMPLETE",
       sellingPrice: customerPrice === "" ? storePrice : Number(customerPrice),
       amountPaidNow: paidAmount,
       paymentMethod: paidAmount > 0 ? paymentMethod : null,
-      transactionRef: transactionRef || null,
+      // Cash has no transaction id
+      transactionRef:
+        paidAmount > 0 && paymentMethod !== "CASH"
+          ? transactionRef.trim() || null
+          : null,
       remarks: "Restocked via UI",
-      installmentPlan: useInstallments ? plan : null,
     });
   };
 
@@ -376,70 +354,16 @@ const UpdateStockModal = ({
             </section>
 
             {/* VENDOR PAYMENT SECTION */}
-            <section className="rounded-lg border border-slate-200 bg-white p-3 shadow-xs">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                <h3 className="font-bold text-slate-800">Vendor Payment</h3>
-                <div className="flex items-center gap-3 bg-slate-100 px-2.5 py-1 rounded border border-slate-200">
-                  <label className="flex items-center gap-1.5 text-[11px] font-semibold cursor-pointer text-slate-700">
-                    <input
-                      type="radio"
-                      name="paymentOptionGroup"
-                      checked={paymentOption === "PAID"}
-                      onChange={() => handlePaymentOptionChange("PAID")}
-                      className="h-3 w-3 text-emerald-600"
-                    />
-                    Paid
-                  </label>
-                  <label className="flex items-center gap-1.5 text-[11px] font-semibold cursor-pointer text-slate-700">
-                    <input
-                      type="radio"
-                      name="paymentOptionGroup"
-                      checked={paymentOption === "UNPAID"}
-                      onChange={() => handlePaymentOptionChange("UNPAID")}
-                      className="h-3 w-3 text-amber-600"
-                    />
-                    Unpaid
-                  </label>
-                </div>
-              </div>
-
-              <div className="mt-2.5 grid grid-cols-4 gap-3">
-                <PaymentSummary
-                  label="Total Bill"
-                  value={money(totalBill)}
-                />
-                <PaymentSummary
-                  label="Paid"
-                  value={money(paidAmount)}
-                />
-                <PaymentSummary
-                  label="Due"
-                  value={money(dueAmount)}
-                  danger={!isVendorBillPaid}
-                />
-                <PaymentSummary
-                  label="Status"
-                  value={isVendorBillPaid ? "Paid" : "Unpaid"}
-                  status
-                  paid={isVendorBillPaid}
-                />
-              </div>
-
-              <VendorPaymentDetails
-                option={paymentOption}
-                totalBill={totalBill}
-                advance={amountPaidNow}
-                onAdvanceChange={setAmountPaidNow}
-                method={paymentMethod}
-                onMethodChange={setPaymentMethod}
-                reference={transactionRef}
-                onReferenceChange={setTransactionRef}
-                inInstallments={payInInstallments}
-                onInInstallmentsChange={setPayInInstallments}
-                plan={plan}
-                onPlanChange={setPlan}
-              />
-            </section>
+            {/* VENDOR PAYMENT: Complete | Installment (reusable) */}
+            <VendorPaymentSection
+              status={paymentOption}
+              onStatusChange={handlePaymentOptionChange}
+              totalBill={totalBill}
+              method={paymentMethod}
+              onMethodChange={setPaymentMethod}
+              reference={transactionRef}
+              onReferenceChange={setTransactionRef}
+            />
           </form>
         </div>
 
@@ -453,7 +377,7 @@ const UpdateStockModal = ({
             <span className="mx-2">|</span>
             {isVendorBillPaid ? (
               <span className="font-medium text-emerald-600">
-                Vendor Payment: Paid
+                Vendor Payment: Complete
               </span>
             ) : (
               <span>
@@ -511,27 +435,6 @@ function PriceDisplay({label, value}) {
       <div className="flex h-8 items-center w-full rounded border border-slate-200 bg-slate-100 px-2 text-xs font-semibold text-slate-700">
         {value}
       </div>
-    </div>
-  );
-}
-
-function PaymentSummary({
-  label,
-  value,
-  danger = false,
-  status = false,
-  paid = false,
-}) {
-  return (
-    <div className="rounded border border-slate-200 bg-slate-50 px-2.5 py-1">
-      <p className="text-[9px] font-semibold uppercase text-slate-400">
-        {label}
-      </p>
-      <p
-        className={`font-bold ${status ? (paid ? "text-emerald-600" : "text-amber-600") : danger ? "text-amber-600" : "text-slate-800"}`}
-      >
-        {value}
-      </p>
     </div>
   );
 }

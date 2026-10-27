@@ -208,7 +208,7 @@ const AddProduct = () => {
           <button
             type="button"
             onClick={() => setIsStockModalOpen(true)}
-            className="h-9 px-3.5 rounded-lg text-sm font-semibold text-white bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 shadow-sm hover:shadow-md active:scale-95 transition flex items-center justify-center gap-1.5 cursor-pointer"
+            className="h-9 px-3.5 rounded-lg text-sm font-semibold text-white bg-linear-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 shadow-sm hover:shadow-md active:scale-95 transition flex items-center justify-center gap-1.5 cursor-pointer"
           >
             <PackagePlus size={16} />
             <span className="truncate">Update stock</span>
@@ -217,7 +217,7 @@ const AddProduct = () => {
           <button
             type="button"
             onClick={() => setIsModalOpen(true)}
-            className="h-9 px-3.5 rounded-lg text-sm font-semibold text-white bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 shadow-sm hover:shadow-md active:scale-95 transition flex items-center justify-center gap-1.5 cursor-pointer"
+            className="h-9 px-3.5 rounded-lg text-sm font-semibold text-white bg-linear-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 shadow-sm hover:shadow-md active:scale-95 transition flex items-center justify-center gap-1.5 cursor-pointer"
           >
             <Plus size={16} />
             <span className="truncate">Add Product</span>

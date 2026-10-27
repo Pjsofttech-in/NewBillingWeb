@@ -6,10 +6,13 @@ import {fetchVendorBills} from "../../api/vendorServiceApi";
 import {vendorBillInstallmentApi} from "../../api/installmentApi";
 import Pagination from "../../Components/Pagination";
 import {usePagination} from "../../hooks/usePagination";
-import VendorBillDetailModal, {
-  StatusBadge,
-  money,
-} from "./VendorBillDetailModal";
+import VendorBillDetailModal, {money} from "./VendorBillDetailModal";
+import Toast from "../../Components/Toast";
+import InstallmentPlanModal from "../../Components/InstallmentPlanModal";
+import VendorBillStatusBadge, {
+  VENDOR_BILL_STATUS_FILTERS,
+  getVendorBillPaymentDisplay,
+} from "../../Components/VendorBillStatusBadge";
 
 const SummaryCard = ({label, value, tone = "blue"}) => {
   // Pre-configured color schemes based on the tone prop
@@ -35,7 +38,6 @@ const SummaryCard = ({label, value, tone = "blue"}) => {
     </div>
   );
 };
-const STATUS_FILTERS = ["ALL", "UNPAID", "PARTIAL", "PAID"];
 
 // Each vendor bill (one per stock purchase) is its own row.
 const VendorBillPage = () => {
@@ -43,6 +45,8 @@ const VendorBillPage = () => {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("ALL");
   const [selectedBill, setSelectedBill] = useState(null);
+  const [planBill, setPlanBill] = useState(null); // "Installment" badge -> plan window
+  const [toast, setToast] = useState(null);
 
   const {
     data: bills = [],
@@ -75,13 +79,17 @@ const VendorBillPage = () => {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return bills.filter((b) => {
-      if (status !== "ALL" && b.paymentStatus !== status) return false;
+      if (
+        status !== "ALL" &&
+        getVendorBillPaymentDisplay(b, nextDueByBill.has(b.id)).key !== status
+      )
+        return false;
       if (!q) return true;
       return [b.billNumber, b.vendor?.vendorName, b.vendor?.companyName].some(
         (f) => (f || "").toLowerCase().includes(q),
       );
     });
-  }, [bills, search, status]);
+  }, [bills, search, status, nextDueByBill]);
 
   // back to page 1 whenever the search or the status filter changes
   const pagination = usePagination(filtered, 25, `${search}|${status}`);
@@ -141,12 +149,12 @@ const VendorBillPage = () => {
             className="h-9 rounded-lg border border-slate-300 bg-white px-2 text-sm"
             aria-label="Filter by status"
           >
-            {STATUS_FILTERS.map((s) => (
+            {VENDOR_BILL_STATUS_FILTERS.map((s) => (
               <option
-                key={s}
-                value={s}
+                key={s.value}
+                value={s.value}
               >
-                {s === "ALL" ? "All statuses" : s}
+                {s.label}
               </option>
             ))}
           </select>
@@ -212,7 +220,7 @@ const VendorBillPage = () => {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[900px] text-xs">
-              <thead className="bg-slate-100 text-[11px] uppercase tracking-wider text-black font-bold">
+              <thead className="text-[11px] uppercase tracking-wider font-bold bg-blue-400 text-white">
                 <tr>
                   <th className="px-2 py-2 text-left">Sr. No.</th>
                   <th className="px-2 py-2 text-left">Bill No.</th>
@@ -267,7 +275,11 @@ const VendorBillPage = () => {
                         {money(b.dueAmount)}
                       </td>
                       <td className="px-2 py-1.5">
-                        <StatusBadge status={b.paymentStatus} />
+                        <VendorBillStatusBadge
+                          bill={b}
+                          hasPlan={nextDueByBill.has(b.id)}
+                          onOpen={setPlanBill}
+                        />
                       </td>
                       <td className="px-2 py-1.5 text-[11px]">
                         {next ? (
@@ -287,7 +299,7 @@ const VendorBillPage = () => {
                               {money(next.pendingAmount)}
                             </p>
                           </>
-                        ) : b.paymentStatus !== "PAID" && b.dueDate ? (
+                        ) : Number(b.dueAmount) > 0 && b.dueDate ? (
                           <p className="text-slate-600">Bill due {b.dueDate}</p>
                         ) : (
                           <span className="text-slate-400">-</span>
@@ -321,6 +333,30 @@ const VendorBillPage = () => {
           onItemsPerPageChange={pagination.setItemsPerPage}
         />
       </div>
+
+      {planBill && (
+        <InstallmentPlanModal
+          kind="vendor"
+          referenceId={planBill.id}
+          title={planBill.billNumber || `Bill #${planBill.id}`}
+          summary={{
+            total: planBill.totalAmount,
+            paid: planBill.paidAmount,
+            pending: planBill.dueAmount,
+          }}
+          showToast={(message, type = "success") => setToast({message, type})}
+          onClose={() => setPlanBill(null)}
+          onChanged={() => refetch()}
+        />
+      )}
+
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
 
       {selectedBill && (
         <VendorBillDetailModal

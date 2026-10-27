@@ -6,8 +6,9 @@ import {useAuth} from "./Context/AuthContext";
 const SettingPage = lazy(() => import("./Pages/Settings/SettingPage"));
 const Dashboard = lazy(() => import("./Pages/Dashboard/Dashboard"));
 import ProtectedRoute from "./ProtectedRoutes/ProtectedRoutes";
-import SubCategoryPage from "./Pages/Settings/product/Subcategorypage";
+
 import AttributePage from "./Pages/Settings/Attribute/Attributepage";
+import SubCategoryManager from "./Pages/Settings/SubCategory/SubCategoryManager";
 const AddProduct = lazy(() => import("./Pages/Produt/AddProduct"));
 const OrderPage = lazy(() => import("./Pages/Order/OrderPage"));
 const Shipment = lazy(() => import("./Pages/Shipment/Shipment"));
@@ -68,7 +69,7 @@ const App = () => {
             />
             <Route
               path="/product-types/:productTypeId/sub-categories"
-              element={<SubCategoryPage />}
+              element={<SubCategoryManager />}
             />
             <Route
               path="/product-types/:productTypeId/attributes"

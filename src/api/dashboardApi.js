@@ -4,8 +4,7 @@ export const fetchDashboardSummary = async () =>
 export const fetchTopSellingProducts = async (limit = 5) =>
   (await API.get("/dashboard/top-selling", {params: {limit}})).data;
 export const fetchTopSellingCategories = async (limit = 5) =>
-  (await API.get("/dashboard/top-selling-categories", {params: {limit}}))
-    .data;
+  (await API.get("/dashboard/top-selling-categories", {params: {limit}})).data;
 export const fetchLowStockAlerts = async (threshold = 5) =>
   (await API.get("/dashboard/low-stock", {params: {threshold}})).data;
 export const fetchPaymentStatusRevenue = async () =>

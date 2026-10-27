@@ -3,9 +3,25 @@ import {useQuery} from "@tanstack/react-query";
 import {X, Printer, FileText, Download} from "lucide-react";
 import {downloadInvoicePdf, openInvoicePdf} from "../../api/invoiceApi";
 import {fetchPaymentsByOrder} from "../../api/paymentService";
+import {orderInstallmentApi} from "../../api/installmentApi";
+import {moneyPlain as money} from "../../utils/format";
 
-const money = (v) => `₹${Number(v || 0).toFixed(2)}`;
 const paidStatuses = ["PAID", "PARTIAL"];
+
+// Discounts. New orders have these saved in the database; older orders are worked out
+// from MRP, selling price and quantity so every invoice shows the same numbers.
+//   MRP discount   = MRP total - selling total (price below the MRP)
+//   Extra discount = discount % typed on the order
+//   Total discount = MRP discount + extra discount
+const itemMrpTotal = (i) =>
+  Math.max(Number(i.productMrp || 0), Number(i.unitPrice || 0)) *
+  Number(i.quantity || 0);
+const itemMrpDiscount = (i) =>
+  i.mrpDiscountAmount ??
+  Math.max(0, itemMrpTotal(i) - Number(i.subtotalAmount || 0));
+const orderMrpDiscount = (order) =>
+  order.totalMrpDiscountAmount ??
+  (order.orderItems || []).reduce((sum, i) => sum + itemMrpDiscount(i), 0);
 
 export default function InvoiceModal({order, isOpen, onClose}) {
   const [busy, setBusy] = useState("");
@@ -16,6 +32,22 @@ export default function InvoiceModal({order, isOpen, onClose}) {
     queryFn: () => fetchPaymentsByOrder(order.id),
     enabled: Boolean(order && isOpen),
   });
+
+  // Installment plan (schedule + every payment made against it), only for orders paid in installments
+  const {data: plan} = useQuery({
+    queryKey: ["order-installment-plan", order?.id],
+    queryFn: () => orderInstallmentApi.fetchPlan(order.id),
+    enabled: Boolean(order && isOpen && order.hasInstallmentPlan),
+    retry: false,
+  });
+
+  const installments = plan?.installments || [];
+  const installmentPayments = installments.flatMap((inst) =>
+    (inst.payments || []).map((p) => ({
+      ...p,
+      installmentNumber: inst.installmentNumber,
+    })),
+  );
 
   const paid = useMemo(
     () =>
@@ -55,9 +87,15 @@ export default function InvoiceModal({order, isOpen, onClose}) {
         <div className="flex items-center justify-between bg-blue-500 px-6 py-4 text-white">
           <div className="flex items-center gap-2">
             <FileText className="h-5 w-5 text-blue-100" />
-            <h2 className="text-lg font-bold">Invoice Preview — INV-{order.id}</h2>
+            <h2 className="text-lg font-bold">
+              Invoice Preview — INV-{order.id}
+            </h2>
           </div>
-          <button type="button" onClick={onClose} className="cursor-pointer">
+          <button
+            type="button"
+            onClick={onClose}
+            className="cursor-pointer"
+          >
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -67,38 +105,66 @@ export default function InvoiceModal({order, isOpen, onClose}) {
             <div>
               <h3 className="font-bold text-slate-800">Bill To</h3>
               <p>{order.customer?.customerName || "N/A"}</p>
-              <p className="text-sm text-slate-500">{order.customer?.phone || ""}</p>
+              <p className="text-sm text-slate-500">
+                {order.customer?.phone || ""}
+              </p>
             </div>
             <div className="sm:text-right">
-              <p><b>Order:</b> #{order.id}</p>
-              <p><b>Date:</b> {order.orderDate || "N/A"}</p>
-              <p><b>Status:</b> {order.status || "N/A"}</p>
+              <p>
+                <b>Order:</b> #{order.id}
+              </p>
+              <p>
+                <b>Date:</b> {order.orderDate || "N/A"}
+              </p>
+              <p>
+                <b>Status:</b> {order.status || "N/A"}
+              </p>
             </div>
           </div>
 
           <div className="mt-5 overflow-x-auto">
-            <table className="w-full min-w-[800px] text-sm">
+            <table className="w-full min-w-[900px] text-sm">
               <thead>
                 <tr className="border-y bg-slate-50 text-left text-xs text-slate-500">
                   <th className="p-2">Product</th>
                   <th className="p-2 text-right">MRP</th>
                   <th className="p-2 text-right">Qty</th>
                   <th className="p-2 text-right">Unit</th>
-                  <th className="p-2 text-right">Discount</th>
+                  <th className="p-2 text-right">MRP Disc.</th>
+                  <th className="p-2 text-right">Extra Disc.</th>
                   <th className="p-2 text-right">GST</th>
                   <th className="p-2 text-right">Total</th>
                 </tr>
               </thead>
               <tbody>
                 {(order.orderItems || []).map((i, idx) => (
-                  <tr key={i.id || idx} className="border-b">
-                    <td className="p-2">{i.product?.productName || "Product"}</td>
+                  <tr
+                    key={i.id || idx}
+                    className="border-b"
+                  >
+                    <td className="p-2">
+                      {i.product?.productName || "Product"}
+                    </td>
                     <td className="p-2 text-right">{money(i.productMrp)}</td>
                     <td className="p-2 text-right">{i.quantity}</td>
                     <td className="p-2 text-right">{money(i.unitPrice)}</td>
-                    <td className="p-2 text-right">-{money(i.discountAmount)}</td>
-                    <td className="p-2 text-right">{money(i.totalGstAmount)}</td>
-                    <td className="p-2 text-right font-semibold">{money(i.totalPrice)}</td>
+                    <td className="p-2 text-right">
+                      -{money(itemMrpDiscount(i))}
+                    </td>
+                    <td className="p-2 text-right">
+                      -{money(i.discountAmount)}
+                      {Number(i.customerDiscountPercentage) > 0 && (
+                        <span className="block text-[11px] text-slate-500">
+                          ({Number(i.customerDiscountPercentage)}%)
+                        </span>
+                      )}
+                    </td>
+                    <td className="p-2 text-right">
+                      {money(i.totalGstAmount)}
+                    </td>
+                    <td className="p-2 text-right font-semibold">
+                      {money(i.totalPrice)}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -106,29 +172,94 @@ export default function InvoiceModal({order, isOpen, onClose}) {
           </div>
 
           <div className="mt-5 ml-auto w-full max-w-md space-y-1 rounded-xl bg-slate-50 p-4 text-sm">
-            <div className="flex justify-between"><span>Subtotal</span><b>{money(order.subtotalAmount)}</b></div>
-            <div className="flex justify-between"><span>Total Discount</span><b>-{money(order.totalDiscountAmount)}</b></div>
-            <div className="flex justify-between"><span>Taxable Amount</span><b>{money(order.taxableAmount)}</b></div>
-            <div className="flex justify-between"><span>CGST</span><b>{money(order.totalCgstAmount)}</b></div>
-            <div className="flex justify-between"><span>SGST</span><b>{money(order.totalSgstAmount)}</b></div>
-            <div className="flex justify-between"><span>UGST</span><b>{money(order.totalUgstAmount)}</b></div>
-            <div className="flex justify-between"><span>IGST</span><b>{money(order.totalIgstAmount)}</b></div>
-            <div className="flex justify-between"><span>Total GST</span><b>{money(order.totalGstAmount)}</b></div>
-            <div className="flex justify-between border-t pt-2 text-base"><b>Grand Total</b><b>{money(order.totalAmount)}</b></div>
+            <div className="flex justify-between">
+              <span>MRP Total</span>
+              <b>
+                {money(
+                  order.mrpTotalAmount ??
+                    Number(order.subtotalAmount || 0) +
+                      orderMrpDiscount(order),
+                )}
+              </b>
+            </div>
+            <div className="flex justify-between">
+              <span>MRP Discount</span>
+              <b>-{money(orderMrpDiscount(order))}</b>
+            </div>
+            <div className="flex justify-between">
+              <span>Subtotal (selling price)</span>
+              <b>{money(order.subtotalAmount)}</b>
+            </div>
+            <div className="flex justify-between">
+              <span>Extra Discount</span>
+              <b>-{money(order.totalDiscountAmount)}</b>
+            </div>
+            <div className="flex justify-between font-semibold text-emerald-700">
+              <span>Total Discount</span>
+              <b>
+                -
+                {money(
+                  order.totalSavingsAmount ??
+                    orderMrpDiscount(order) +
+                      Number(order.totalDiscountAmount || 0),
+                )}
+              </b>
+            </div>
+            <div className="flex justify-between">
+              <span>Taxable Amount</span>
+              <b>{money(order.taxableAmount)}</b>
+            </div>
+            <div className="flex justify-between">
+              <span>CGST</span>
+              <b>{money(order.totalCgstAmount)}</b>
+            </div>
+            <div className="flex justify-between">
+              <span>SGST</span>
+              <b>{money(order.totalSgstAmount)}</b>
+            </div>
+            <div className="flex justify-between">
+              <span>UGST</span>
+              <b>{money(order.totalUgstAmount)}</b>
+            </div>
+            <div className="flex justify-between">
+              <span>IGST</span>
+              <b>{money(order.totalIgstAmount)}</b>
+            </div>
+            <div className="flex justify-between">
+              <span>Total GST</span>
+              <b>{money(order.totalGstAmount)}</b>
+            </div>
+            <div className="flex justify-between border-t pt-2 text-base">
+              <b>Grand Total</b>
+              <b>{money(order.totalAmount)}</b>
+            </div>
           </div>
 
           <div className="mt-5">
             <h3 className="mb-2 font-bold text-slate-800">Payment Details</h3>
             {isLoading ? (
-              <p className="text-sm text-slate-500">Loading payment status...</p>
+              <p className="text-sm text-slate-500">
+                Loading payment status...
+              </p>
             ) : (
               <>
                 <div className="mb-2 grid grid-cols-3 gap-3">
-                  <div className="rounded-lg bg-emerald-50 p-3 text-sm"><p>Paid</p><b>{money(paid)}</b></div>
-                  <div className="rounded-lg bg-amber-50 p-3 text-sm"><p>Pending</p><b>{money(due)}</b></div>
-                  <div className="rounded-lg bg-blue-50 p-3 text-sm"><p>Status</p><b>{due <= 0.009 ? "PAID" : paid > 0 ? "PARTIAL" : "UNPAID"}</b></div>
+                  <div className="rounded-lg bg-emerald-50 p-3 text-sm">
+                    <p>Paid</p>
+                    <b>{money(paid)}</b>
+                  </div>
+                  <div className="rounded-lg bg-amber-50 p-3 text-sm">
+                    <p>Pending</p>
+                    <b>{money(due)}</b>
+                  </div>
+                  <div className="rounded-lg bg-blue-50 p-3 text-sm">
+                    <p>Status</p>
+                    <b>
+                      {due <= 0.009 ? "PAID" : paid > 0 ? "PARTIAL" : "UNPAID"}
+                    </b>
+                  </div>
                 </div>
-                {payments.length > 0 && (
+                {!plan && payments.length > 0 && (
                   <div className="overflow-x-auto">
                     <table className="w-full text-xs">
                       <thead>
@@ -141,11 +272,18 @@ export default function InvoiceModal({order, isOpen, onClose}) {
                       </thead>
                       <tbody>
                         {payments.map((p) => (
-                          <tr key={p.id} className="border-b">
+                          <tr
+                            key={p.id}
+                            className="border-b"
+                          >
                             <td className="p-2">{p.paymentDate}</td>
-                            <td className="p-2">{p.paymentMethod?.replaceAll("_", " ")}</td>
+                            <td className="p-2">
+                              {p.paymentMethod?.replaceAll("_", " ")}
+                            </td>
                             <td className="p-2">{p.paymentStatus}</td>
-                            <td className="p-2 text-right">{money(p.amount)}</td>
+                            <td className="p-2 text-right">
+                              {money(p.amount)}
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -155,6 +293,107 @@ export default function InvoiceModal({order, isOpen, onClose}) {
               </>
             )}
           </div>
+
+          {plan && (
+            <div className="mt-5">
+              <h3 className="mb-2 font-bold text-slate-800">
+                Installment Details
+              </h3>
+              <div className="mb-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <div className="rounded-lg bg-slate-50 p-3 text-sm">
+                  <p>Installments</p>
+                  <b>
+                    {plan.paidInstallments} / {plan.totalInstallments} paid
+                  </b>
+                </div>
+                <div className="rounded-lg bg-blue-50 p-3 text-sm">
+                  <p>Plan amount</p>
+                  <b>{money(plan.planAmount)}</b>
+                </div>
+                <div className="rounded-lg bg-emerald-50 p-3 text-sm">
+                  <p>Paid</p>
+                  <b>{money(plan.paidAmount)}</b>
+                </div>
+                <div className="rounded-lg bg-amber-50 p-3 text-sm">
+                  <p>Pending</p>
+                  <b>{money(plan.pendingAmount)}</b>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b text-left">
+                      <th className="p-2">No.</th>
+                      <th className="p-2">Due date</th>
+                      <th className="p-2 text-right">Amount</th>
+                      <th className="p-2 text-right">Paid</th>
+                      <th className="p-2 text-right">Pending</th>
+                      <th className="p-2">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {installments.map((inst) => (
+                      <tr
+                        key={inst.id}
+                        className="border-b"
+                      >
+                        <td className="p-2">{inst.installmentNumber}</td>
+                        <td className="p-2">{inst.dueDate}</td>
+                        <td className="p-2 text-right">
+                          {money(inst.dueAmount)}
+                        </td>
+                        <td className="p-2 text-right">
+                          {money(inst.paidAmount)}
+                        </td>
+                        <td className="p-2 text-right">
+                          {money(inst.pendingAmount)}
+                        </td>
+                        <td className="p-2 font-semibold">{inst.status}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {installmentPayments.length > 0 && (
+                <div className="mt-4 overflow-x-auto">
+                  <p className="mb-1 text-sm font-semibold text-slate-700">
+                    Installment payments received
+                  </p>
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b text-left">
+                        <th className="p-2">Installment</th>
+                        <th className="p-2">Paid on</th>
+                        <th className="p-2">Method</th>
+                        <th className="p-2">Reference</th>
+                        <th className="p-2 text-right">Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {installmentPayments.map((p) => (
+                        <tr
+                          key={p.id}
+                          className="border-b"
+                        >
+                          <td className="p-2">#{p.installmentNumber}</td>
+                          <td className="p-2">{p.paymentDate}</td>
+                          <td className="p-2">
+                            {p.paymentMethod?.replaceAll("_", " ")}
+                          </td>
+                          <td className="p-2">
+                            {p.transactionReference || "—"}
+                          </td>
+                          <td className="p-2 text-right">{money(p.amount)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
           {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
         </div>
 

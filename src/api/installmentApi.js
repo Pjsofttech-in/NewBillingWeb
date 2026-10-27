@@ -8,6 +8,12 @@ const createInstallmentApi = (base, scope) => ({
   //       or CUSTOM {installments: [{dueAmount, dueDate}]}
   createPlan: async ({id, ...payload}) =>
     (await API.post(`${base}/${scope}/${id}`, payload)).data,
+  // payload: {dueAmount, dueDate} - installment for the amount that is not in the plan yet (orders only)
+  addInstallment: async ({id, ...payload}) =>
+    (await API.post(`${base}/${scope}/${id}/add`, payload)).data,
+  // rows: [{id?, dueAmount, dueDate}] - the installments without payment (orders only)
+  updateInstallments: async ({id, rows}) =>
+    (await API.put(`${base}/${scope}/${id}`, rows)).data,
   deletePlan: async (id) => (await API.delete(`${base}/${scope}/${id}`)).data,
   // payload: {amount, paymentDate?, paymentMethod, receivingAccountId?, transactionReference?, notes?}
   payInstallment: async ({installmentId, ...payload}) =>

@@ -14,17 +14,13 @@ import Input from "../../Components/Form/Input";
 import Select from "../../Components/Form/Select";
 import Checkbox from "../../Components/Form/Checkbox";
 import VendorDiscountFields from "../../Components/Form/VendorDiscountFields";
-import VendorPaymentDetails, {
-  EMPTY_PLAN,
-  createPlanForNewBill,
-  planFirstDate,
-  validatePlan,
-} from "../../Components/Form/VendorPaymentDetails";
+import VendorPaymentSection from "../../Components/Form/VendorPaymentSection";
 import {
   resolveVendorPricing,
   valueForMode,
   vendorPricingFields,
 } from "../../utils/vendorPricing";
+import {money} from "../../utils/format";
 
 const DEFAULT_VALUES = {
   productName: "",
@@ -53,11 +49,6 @@ const DEFAULT_VALUES = {
   transactionRef: "",
 };
 
-const money = (value) =>
-  `₹${Number(value || 0).toLocaleString("en-IN", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
 
 const safeFloat = (value) => {
   const number = Number.parseFloat(value);
@@ -72,9 +63,8 @@ const safeInt = (value) => {
 export default function ProductModal({isOpen, onClose, onSuccess}) {
   const queryClient = useQueryClient();
   const [errorMessage, setErrorMessage] = useState("");
-  const [paymentOption, setPaymentOption] = useState("UNPAID"); // PAID | UNPAID
-  const [payInInstallments, setPayInInstallments] = useState(false);
-  const [plan, setPlan] = useState(EMPTY_PLAN);
+  // COMPLETE: bill paid now | INSTALLMENT: unpaid, plan is created in Vendor Bills
+  const [paymentOption, setPaymentOption] = useState("INSTALLMENT");
   const [discountMode, setDiscountMode] = useState("PERCENT");
   const [discountValue, setDiscountValue] = useState("0");
 
@@ -108,7 +98,7 @@ export default function ProductModal({isOpen, onClose, onSuccess}) {
   const watchedRef = useWatch({control, name: "transactionRef"});
 
   /*
-   * Vendor pricing is on the ACTUAL Product MRP: flat price (₹) OR discount %, the other is calculated.
+   * Vendor pricing is on the ACTUAL Product MRP: flat price () OR discount %, the other is calculated.
    */
   const pricing = useMemo(
     () =>
@@ -174,16 +164,17 @@ export default function ProductModal({isOpen, onClose, onSuccess}) {
 
   const handlePaymentOptionChange = (option) => {
     setPaymentOption(option);
-    if (option === "PAID") {
+    if (option === "COMPLETE") {
       setValue("amountPaidNow", totalBill.toString());
-      setPayInInstallments(false);
     } else {
       setValue("amountPaidNow", "0");
+      setValue("paymentMethod", "CASH");
+      setValue("transactionRef", "");
     }
   };
 
   useEffect(() => {
-    if (paymentOption === "PAID") {
+    if (paymentOption === "COMPLETE") {
       setValue("amountPaidNow", totalBill.toString());
     }
   }, [totalBill, paymentOption, setValue]);
@@ -255,23 +246,10 @@ export default function ProductModal({isOpen, onClose, onSuccess}) {
   });
 
   const createMutation = useMutation({
-    mutationFn: async ({
-      productPayload,
-      stockPayload,
-      attributeValues,
-      installmentPlan,
-    }) => {
+    mutationFn: async ({productPayload, stockPayload, attributeValues}) => {
       const product = await createProduct(productPayload);
-      let planError = null;
       if (stockPayload.addedQuantity > 0) {
         await updateProductStock({id: product.id, ...stockPayload});
-        if (installmentPlan) {
-          // the stock purchase created the vendor bill; put it on the plan
-          planError = await createPlanForNewBill(
-            stockPayload.vendorId,
-            installmentPlan,
-          );
-        }
       }
       await Promise.all(
         attributeValues
@@ -284,9 +262,9 @@ export default function ProductModal({isOpen, onClose, onSuccess}) {
             }),
           ),
       );
-      return {product, planError};
+      return {product};
     },
-    onSuccess: ({planError}) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({queryKey: ["products"]});
       queryClient.invalidateQueries({queryKey: ["productBatches"]});
       queryClient.invalidateQueries({queryKey: ["vendorBills"]});
@@ -295,13 +273,11 @@ export default function ProductModal({isOpen, onClose, onSuccess}) {
         ...DEFAULT_VALUES,
         receivedDate: new Date().toISOString().slice(0, 10),
       });
-      setPaymentOption("UNPAID");
-      setPayInInstallments(false);
-      setPlan(EMPTY_PLAN);
+      setPaymentOption("INSTALLMENT");
       setDiscountMode("PERCENT");
       setDiscountValue("0");
       setErrorMessage("");
-      onSuccess?.(planError);
+      onSuccess?.();
       onClose();
     },
     onError: (error) => {
@@ -316,7 +292,9 @@ export default function ProductModal({isOpen, onClose, onSuccess}) {
   const onSubmit = (data) => {
     setErrorMessage("");
     const quantity = safeInt(data.stock);
-    const amountPaidNow = Math.max(0, safeFloat(data.amountPaidNow));
+    // Complete = the whole bill is paid now, Installment = nothing is paid now
+    const isComplete = paymentOption === "COMPLETE";
+    const amountPaidNow = isComplete ? totalBill : 0;
     const actualProductMrp = Math.max(0, safeFloat(data.productMrp));
     const customerPrice = Math.max(0, safeFloat(data.customerPrice));
 
@@ -340,19 +318,9 @@ export default function ProductModal({isOpen, onClose, onSuccess}) {
       setErrorMessage(pricing.error);
       return;
     }
-    if (amountPaidNow > totalBill + 0.009) {
-      setErrorMessage("Amount paid now cannot exceed the vendor bill amount.");
+    if (isComplete && quantity > 0 && !data.paymentMethod) {
+      setErrorMessage("Select the payment method.");
       return;
-    }
-
-    const useInstallments =
-      paymentOption === "UNPAID" && payInInstallments && quantity > 0;
-    if (useInstallments) {
-      const planProblem = validatePlan(plan, totalBill - amountPaidNow);
-      if (planProblem) {
-        setErrorMessage(planProblem);
-        return;
-      }
     }
 
     const productPayload = {
@@ -388,11 +356,16 @@ export default function ProductModal({isOpen, onClose, onSuccess}) {
       sellingPrice: customerPrice,
       addedQuantity: quantity,
       receivedDate: data.receivedDate || null,
-      dueDate: useInstallments ? planFirstDate(plan) || null : null,
+      dueDate: null,
+      // saved on the vendor bill: the bill list then shows "Installment"
+      installmentRequested: !isComplete && quantity > 0,
       amountPaidNow,
       paymentMethod: amountPaidNow > 0 ? data.paymentMethod : null,
+      // Cash has no transaction id
       transactionRef:
-        amountPaidNow > 0 ? data.transactionRef?.trim() || null : null,
+        amountPaidNow > 0 && data.paymentMethod !== "CASH"
+          ? data.transactionRef?.trim() || null
+          : null,
     };
 
     const attributeValues = Array.isArray(attributes)
@@ -402,13 +375,10 @@ export default function ProductModal({isOpen, onClose, onSuccess}) {
         }))
       : [];
 
-    const installmentPlan = useInstallments ? plan : null;
-
     createMutation.mutate({
       productPayload,
       stockPayload,
       attributeValues,
-      installmentPlan,
     });
   };
 
@@ -673,71 +643,16 @@ export default function ProductModal({isOpen, onClose, onSuccess}) {
               )}
             </section>
 
-            {/* VENDOR PAYMENT */}
-            <section className="rounded-lg border border-slate-200 bg-white p-3 shadow-xs">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                <h3 className="font-bold text-slate-800">Vendor Payment</h3>
-                <div className="flex items-center gap-3 bg-slate-100 px-2.5 py-1 rounded border border-slate-200">
-                  <label className="flex items-center gap-1.5 text-[11px] font-semibold cursor-pointer text-slate-700">
-                    <input
-                      type="radio"
-                      name="paymentOptionGroup"
-                      checked={paymentOption === "PAID"}
-                      onChange={() => handlePaymentOptionChange("PAID")}
-                      className="h-3 w-3 text-emerald-600"
-                    />
-                    Paid
-                  </label>
-                  <label className="flex items-center gap-1.5 text-[11px] font-semibold cursor-pointer text-slate-700">
-                    <input
-                      type="radio"
-                      name="paymentOptionGroup"
-                      checked={paymentOption === "UNPAID"}
-                      onChange={() => handlePaymentOptionChange("UNPAID")}
-                      className="h-3 w-3 text-amber-600"
-                    />
-                    Unpaid
-                  </label>
-                </div>
-              </div>
-
-              <div className="mt-2.5 grid grid-cols-4 gap-3">
-                <PaymentSummary
-                  label="Total Bill"
-                  value={money(totalBill)}
-                />
-                <PaymentSummary
-                  label="Paid"
-                  value={money(paidAmount)}
-                />
-                <PaymentSummary
-                  label="Due"
-                  value={money(dueAmount)}
-                  danger={!isVendorBillPaid}
-                />
-                <PaymentSummary
-                  label="Status"
-                  value={isVendorBillPaid ? "Paid" : "Unpaid"}
-                  status
-                  paid={isVendorBillPaid}
-                />
-              </div>
-
-              <VendorPaymentDetails
-                option={paymentOption}
-                totalBill={totalBill}
-                advance={watchedPaid}
-                onAdvanceChange={(v) => setValue("amountPaidNow", v)}
-                method={watchedMethod}
-                onMethodChange={(v) => setValue("paymentMethod", v)}
-                reference={watchedRef}
-                onReferenceChange={(v) => setValue("transactionRef", v)}
-                inInstallments={payInInstallments}
-                onInInstallmentsChange={setPayInInstallments}
-                plan={plan}
-                onPlanChange={setPlan}
-              />
-            </section>
+            {/* VENDOR PAYMENT: Complete | Installment (reusable) */}
+            <VendorPaymentSection
+              status={paymentOption}
+              onStatusChange={handlePaymentOptionChange}
+              totalBill={totalBill}
+              method={watchedMethod}
+              onMethodChange={(v) => setValue("paymentMethod", v)}
+              reference={watchedRef}
+              onReferenceChange={(v) => setValue("transactionRef", v)}
+            />
           </form>
         </div>
 
@@ -746,7 +661,7 @@ export default function ProductModal({isOpen, onClose, onSuccess}) {
           <div className="text-xs text-slate-500">
             {isVendorBillPaid ? (
               <span className="font-medium text-emerald-600">
-                Vendor Payment: Paid
+                Vendor Payment: Complete
               </span>
             ) : (
               <span>
@@ -796,27 +711,6 @@ function PriceDisplay({label, value}) {
       <div className="flex h-8 items-center w-full rounded border border-slate-200 bg-slate-100 px-2 py-5 text-xs font-semibold text-slate-700">
         {value}
       </div>
-    </div>
-  );
-}
-
-function PaymentSummary({
-  label,
-  value,
-  danger = false,
-  status = false,
-  paid = false,
-}) {
-  return (
-    <div className="rounded border border-slate-200 bg-slate-50 px-2.5 py-1">
-      <p className="text-[9px] font-semibold uppercase text-slate-400">
-        {label}
-      </p>
-      <p
-        className={`font-bold ${status ? (paid ? "text-emerald-600" : "text-amber-600") : danger ? "text-amber-600" : "text-slate-800"}`}
-      >
-        {value}
-      </p>
     </div>
   );
 }

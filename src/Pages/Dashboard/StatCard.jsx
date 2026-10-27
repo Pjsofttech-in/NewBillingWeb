@@ -16,7 +16,7 @@ export default function StatCard({
     >
       <div>
         <p className="text-xs font-medium text-slate-800">{label}</p>
-        <p className="mt-1 text-base font-bold text-slate-700">
+        <p className="mt-1 text-sm font-medium text-slate-700">
           {loading ? "..." : value}
         </p>
       </div>

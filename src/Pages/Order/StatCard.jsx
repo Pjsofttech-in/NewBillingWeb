@@ -20,7 +20,7 @@ const StatCard = ({label, value, tone = "slate", loading = false}) => {
       className={`flex flex-row items-center justify-center gap-0.5 rounded-2xl border px-2 py-2 text-center shadow-sm transition hover:shadow-md ${t.box}`}
       title={loading ? label : `${label}: ${value}`}
     >
-      <span className="w-full  text-xs font-medium text-slate-800">
+      <span className="w-full  text-sm font-medium text-slate-800">
         {label}
       </span>
 

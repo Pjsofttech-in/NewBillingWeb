@@ -114,11 +114,32 @@ const OrderPage = () => {
     onError: (err) => showToast("Error deleting order: " + (err.response?.data?.message || err.message), "error"),
   });
 
+  // After a NEW order exists: Paid -> record its payment.
+  // (Installment orders only show the "Installment" status; the plan is created from the order list.)
+  // The payment of a "Complete" order is sent WITH the order (one request, one transaction on the
+  // server), so there is no half-saved state. Cash has no account and no transaction id.
+  const buildInitialPayment = (paymentInfo) => {
+    if (paymentInfo?.mode !== "PAID") return undefined;
+    const isCash = paymentInfo.method === "CASH";
+    return {
+      paymentMethod: paymentInfo.method,
+      paymentDate: paymentInfo.paidDate || undefined,
+      receivingAccount:
+        isCash || !paymentInfo.receivingAccountId
+          ? undefined
+          : {id: Number(paymentInfo.receivingAccountId)},
+      transactionReference: isCash
+        ? undefined
+        : paymentInfo.transactionReference || undefined,
+    };
+  };
+
   const handleOrderSubmit = async (
     orderPayload,
     isNewCustomer,
     customerPayload,
     editOrderId = null,
+    paymentInfo = null,
   ) => {
     let finalCustomerId = orderPayload.customer?.id;
 
@@ -143,10 +164,20 @@ const OrderPage = () => {
       return;
     }
 
+    const initialPayment = buildInitialPayment(paymentInfo);
+
     await createOrderMutation.mutateAsync({
       ...orderPayload,
       customer: {id: finalCustomerId},
+      ...(initialPayment ? {initialPayment} : {}),
     });
+
+    if (initialPayment) {
+      queryClient.invalidateQueries({queryKey: ["payments"]});
+      queryClient.invalidateQueries({queryKey: ["orders-gst-summary"]});
+      queryClient.invalidateQueries({queryKey: ["dashboard"]});
+      showToast("Order created and payment recorded", "success");
+    }
   };
 
   const handleDelete = async (orderId) => deleteOrderMutation.mutateAsync(orderId);

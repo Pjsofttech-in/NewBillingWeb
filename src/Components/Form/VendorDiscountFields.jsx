@@ -6,21 +6,34 @@ import {inr} from "../../utils/vendorPricing";
  *  - "Flat Price" : vendor gives a flat price (= purchase price)
  *                   -> shows the discount % of MRP and the discount amount
  */
-const VendorDiscountFields = ({mode, value, onModeChange, onValueChange, resolved}) => {
+const VendorDiscountFields = ({
+  mode,
+  value,
+  onModeChange,
+  onValueChange,
+  resolved,
+}) => {
   const isFlat = mode === "FLAT";
   return (
     <>
       <div className="flex flex-col">
         <div className="mb-1 flex items-center justify-between">
           <label className="text-xs font-semibold text-slate-700">
-            {isFlat ? "Vendor Flat Price (₹)" : "Vendor Disc %"}
+            {isFlat ? "Vendor Flat Price ()" : "Vendor Disc %"}
           </label>
           <div className="flex overflow-hidden rounded border border-slate-300 text-[10px] font-bold">
-            {[["PERCENT", "%"], ["FLAT", "Flat ₹"]].map(([m, label]) => (
+            {[
+              ["PERCENT", "%"],
+              ["FLAT", "Flat "],
+            ].map(([m, label]) => (
               <button
                 key={m}
                 type="button"
-                title={m === "FLAT" ? "Vendor gives a flat price (purchase price)" : "Vendor gives a discount %"}
+                title={
+                  m === "FLAT"
+                    ? "Vendor gives a flat price (purchase price)"
+                    : "Vendor gives a discount %"
+                }
                 onClick={() => onModeChange(m)}
                 className={`px-1.5 py-0.5 ${mode === m ? "bg-blue-600 text-white" : "bg-white text-slate-600"}`}
               >

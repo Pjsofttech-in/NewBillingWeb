@@ -77,7 +77,7 @@ const BatchListModal = ({isOpen, product, onClose}) => {
           ) : (
             <table className="w-full text-xs border-collapse">
               <thead>
-                <tr className="bg-slate-50 border-b">
+                <tr className="border-b bg-blue-400 text-white">
                   <th className="p-3 text-left">Batch</th>
                   <th className="p-3">Vendor</th>
                   <th className="p-3">Received</th>
@@ -91,28 +91,33 @@ const BatchListModal = ({isOpen, product, onClose}) => {
               </thead>
               <tbody className="divide-y">
                 {batches.map((b) => (
-                  <tr key={b.id} className="hover:bg-slate-50">
+                  <tr
+                    key={b.id}
+                    className="hover:bg-slate-50"
+                  >
                     <td className="p-3 font-bold">{b.batchNumber}</td>
                     <td className="p-3">{b.vendor?.vendorName || "N/A"}</td>
                     <td className="p-3 text-center">{b.receivedDate || "-"}</td>
                     <td className="p-3 text-center">{b.initialQuantity}</td>
-                    <td className="p-3 text-center font-bold">{b.availableQuantity}</td>
+                    <td className="p-3 text-center font-bold">
+                      {b.availableQuantity}
+                    </td>
                     <td className="p-3 text-right font-bold text-slate-700">
-                      ₹{Number(b.productMrp || 0).toFixed(2)}
+                      {Number(b.productMrp || 0).toFixed(2)}
                     </td>
                     <td className="p-3 text-center">
                       {Number(b.vendorDiscountPercentage || 0).toFixed(2)}%
                       {b.vendorDiscountAmount != null && (
                         <span className="block text-[10px] text-slate-500">
-                          −₹{Number(b.vendorDiscountAmount).toFixed(2)}
+                          −{Number(b.vendorDiscountAmount).toFixed(2)}
                         </span>
                       )}
                     </td>
                     <td className="p-3 text-right font-bold text-blue-700">
-                      ₹{Number(b.purchasePrice || 0).toFixed(2)}
+                      {Number(b.purchasePrice || 0).toFixed(2)}
                     </td>
                     <td className="p-3 text-right font-bold text-emerald-700">
-                      ₹{Number(b.sellingPrice || 0).toFixed(2)}
+                      {Number(b.sellingPrice || 0).toFixed(2)}
                     </td>
                   </tr>
                 ))}

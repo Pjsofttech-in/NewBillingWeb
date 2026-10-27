@@ -3,8 +3,8 @@ import {X, CreditCard} from "lucide-react";
 import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
 import {createPayment} from "../../api/paymentService";
 import {fetchPaymentReceivingAccounts} from "../../api/storeSettingsApi";
+import {moneyPlain as money} from "../../utils/format";
 
-const money = (v) => `₹${Number(v || 0).toFixed(2)}`;
 
 export default function PaymentModal({
   order,
@@ -30,6 +30,7 @@ export default function PaymentModal({
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState("UPI");
   const [receivingAccountId, setReceivingAccountId] = useState("");
+  const [reference, setReference] = useState("");
   const [prevModalKey, setPrevModalKey] = useState(null);
 
   const currentModalKey = isOpen && order ? `${order.id}-${due}` : null;
@@ -39,6 +40,7 @@ export default function PaymentModal({
       setAmount(due.toFixed(2));
       setMethod("UPI");
       setReceivingAccountId("");
+      setReference("");
     }
   }
 
@@ -72,7 +74,7 @@ export default function PaymentModal({
     e.preventDefault();
     const a = Number(amount);
     if (!a || a <= 0 || a > due + 0.009) {
-      showToast?.(`Enter an amount between ₹0.01 and ${money(due)}`, "error");
+      showToast?.(`Enter an amount between 0.01 and ${money(due)}`, "error");
       return;
     }
     mutation.mutate({
@@ -82,6 +84,8 @@ export default function PaymentModal({
         method === "CASH" || !receivingAccountId
           ? undefined
           : {id: Number(receivingAccountId)},
+      transactionReference:
+        method === "CASH" ? undefined : reference.trim() || undefined,
     });
   };
 
@@ -95,7 +99,11 @@ export default function PaymentModal({
               Record Payment — Order #{order.id}
             </h2>
           </div>
-          <button type="button" onClick={onClose} className="cursor-pointer">
+          <button
+            type="button"
+            onClick={onClose}
+            className="cursor-pointer"
+          >
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -111,10 +119,13 @@ export default function PaymentModal({
           </div>
         </div>
 
-        <form onSubmit={submit} className="mt-4 space-y-4">
+        <form
+          onSubmit={submit}
+          className="mt-4 space-y-4"
+        >
           <div>
             <label className="text-xs font-semibold uppercase text-slate-600">
-              Amount (₹)
+              Amount ()
             </label>
             <input
               type="number"
@@ -157,11 +168,29 @@ export default function PaymentModal({
               >
                 <option value="">No bank account selected</option>
                 {accounts.map((a) => (
-                  <option key={a.id} value={a.id}>
+                  <option
+                    key={a.id}
+                    value={a.id}
+                  >
                     {a.accountName || a.bankName} — {a.accountType}
                   </option>
                 ))}
               </select>
+            </div>
+          )}
+
+          {method !== "CASH" && (
+            <div>
+              <label className="text-xs font-semibold uppercase text-slate-600">
+                Reference ID
+              </label>
+              <input
+                type="text"
+                value={reference}
+                onChange={(e) => setReference(e.target.value)}
+                placeholder="Transaction / UTR / cheque no."
+                className="mt-1 w-full rounded-lg border p-2.5"
+              />
             </div>
           )}
 

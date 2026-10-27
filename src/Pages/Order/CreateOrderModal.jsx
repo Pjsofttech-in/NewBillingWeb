@@ -1,22 +1,64 @@
 import {useEffect, useState} from "react";
 import {useForm, useFieldArray, useWatch} from "react-hook-form";
-import {X, Plus, Trash2, AlertCircle, Package, UserPlus} from "lucide-react";
+import {useQuery} from "@tanstack/react-query";
+import {X, Plus, Trash2, AlertCircle, UserPlus} from "lucide-react";
 
 import CustomerModal from "../Settings/Customer/CustomerModal";
-
 import Input from "../../Components/Form/Input";
-
 import Select from "../../Components/Form/Select";
 import Radio from "../../Components/Form/Radio";
 import StatCard from "./StatCard";
+import {fetchPaymentReceivingAccounts} from "../../api/storeSettingsApi";
+
+const calcLine = (product, qtyRaw, extraRaw) => {
+  const qty = Math.max(0, Number(qtyRaw) || 0);
+  const sell = Number(product?.customerPrice || product?.price || 0);
+  const mrp = Number(product?.productMrp || 0);
+  const extraPct = Math.max(0, Math.min(100, Number(extraRaw) || 0));
+  const gstPct = product?.gstApplicable
+    ? Number(product?.totalGstPercentage || product?.gstPercentage || 0)
+    : 0;
+
+  const sellTotal = sell * qty;
+  const mrpTotal = Math.max(mrp, sell) * qty;
+  const mrpDiscount = mrpTotal - sellTotal;
+  const extraDiscount = (sellTotal * extraPct) / 100;
+  const taxable = Math.max(0, sellTotal - extraDiscount);
+  const gst = (taxable * gstPct) / 100;
+
+  return {
+    qty,
+    sell,
+    mrp,
+    extraPct,
+    gstPct,
+    sellTotal,
+    mrpTotal,
+    mrpDiscount,
+    extraDiscount,
+    totalDiscount: mrpDiscount + extraDiscount,
+    taxable,
+    gst,
+    total: taxable + gst,
+  };
+};
+
+const rupees = (value, digits = 0) =>
+  `₹${Number(value || 0).toLocaleString("en-IN", {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  })}`;
 
 const DEFAULT_VALUES = {
   customerType: "existing",
   customerId: "",
   orderDate: new Date().toISOString().split("T")[0],
-  paymentStatus: "UNPAID", // UNPAID | PAID
-  paymentDueDate: "", // used when UNPAID
-  paymentPaidDate: "", // used when PAID
+  paymentStatus: "INSTALLMENT",
+  paymentDueDate: "",
+  paymentPaidDate: "",
+  paymentMethod: "CASH",
+  receivingAccountId: "",
+  transactionReference: "",
   status: "PENDING",
   orderItems: [
     {
@@ -26,6 +68,14 @@ const DEFAULT_VALUES = {
     },
   ],
 };
+
+const PAYMENT_METHOD_OPTIONS = [
+  {label: "Cash", value: "CASH"},
+  {label: "UPI", value: "UPI"},
+  {label: "Credit Card", value: "CREDIT_CARD"},
+  {label: "Debit Card", value: "DEBIT_CARD"},
+  {label: "Net Banking", value: "NET_BANKING"},
+];
 
 const CreateOrderModal = ({
   isOpen,
@@ -49,30 +99,24 @@ const CreateOrderModal = ({
     setValue,
     reset,
     formState: {errors},
-  } = useForm({
-    defaultValues: DEFAULT_VALUES,
-  });
+  } = useForm({defaultValues: DEFAULT_VALUES});
 
-  const {fields, append, remove} = useFieldArray({
+  const {fields, insert, remove} = useFieldArray({
     control,
     name: "orderItems",
   });
 
-  const watchedItems = useWatch({
-    control,
-    name: "orderItems",
-  });
-
+  const watchedItems = useWatch({control, name: "orderItems"});
   const isEditMode = Boolean(editingOrder?.id);
+  const customerType = useWatch({control, name: "customerType"});
+  const paymentStatus = useWatch({control, name: "paymentStatus"});
+  const paymentMethod = useWatch({control, name: "paymentMethod"});
+  const isCashPayment = paymentMethod === "CASH";
 
-  const customerType = useWatch({
-    control,
-    name: "customerType",
-  });
-
-  const paymentStatus = useWatch({
-    control,
-    name: "paymentStatus",
+  const {data: receivingAccounts = []} = useQuery({
+    queryKey: ["paymentReceivingAccounts"],
+    queryFn: fetchPaymentReceivingAccounts,
+    enabled: isOpen && !isCashPayment,
   });
 
   const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
@@ -90,8 +134,7 @@ const CreateOrderModal = ({
     if (editingOrder?.id) {
       const isPaid =
         editingOrder.paymentStatus === "PAID" ||
-        (editingOrder.pendingAmount !== undefined &&
-          editingOrder.pendingAmount !== null &&
+        (editingOrder.pendingAmount != null &&
           Number(editingOrder.pendingAmount) <= 0.009 &&
           Number(editingOrder.paidAmount || 0) > 0);
 
@@ -101,13 +144,16 @@ const CreateOrderModal = ({
           ? String(editingOrder.customer.id)
           : "",
         orderDate: String(editingOrder.orderDate || "").slice(0, 10),
-        paymentStatus: isPaid ? "PAID" : "UNPAID",
+        paymentStatus: isPaid ? "COMPLETE" : "INSTALLMENT",
         paymentDueDate: editingOrder.paymentDueDate
           ? String(editingOrder.paymentDueDate).slice(0, 10)
           : "",
         paymentPaidDate: editingOrder.paymentPaidDate
           ? String(editingOrder.paymentPaidDate).slice(0, 10)
           : "",
+        paymentMethod: "CASH",
+        receivingAccountId: "",
+        transactionReference: "",
         status: editingOrder.status || "PENDING",
         orderItems: (editingOrder.orderItems || []).map((item) => ({
           productId: item.product?.id ? String(item.product.id) : "",
@@ -129,24 +175,18 @@ const CreateOrderModal = ({
     onClose();
   };
 
-  // Quantity of a product already inside the order being edited (0 when creating).
-  // That quantity is returned to stock by the backend before the edit is applied,
-  // so it must count as available here too.
   const getOriginalQuantity = (productId) =>
     isEditMode
       ? Number(
           (editingOrder?.orderItems || [])
-            .filter(
-              (oldItem) => String(oldItem.product?.id) === String(productId),
-            )
-            .reduce((sum, oldItem) => sum + Number(oldItem.quantity || 0), 0),
+            .filter((i) => String(i.product?.id) === String(productId))
+            .reduce((s, i) => s + Number(i.quantity || 0), 0),
         )
       : 0;
 
   const getEffectiveStock = (product) =>
     product ? Number(product.stock ?? 0) + getOriginalQuantity(product.id) : 0;
 
-  // Same product on several lines -> ONE line (quantities added, discount weighted by quantity).
   const mergeDuplicateItems = (rawItems = []) => {
     const merged = new Map();
     rawItems.forEach((item) => {
@@ -182,175 +222,151 @@ const CreateOrderModal = ({
     {skipForCancellation = false} = {},
   ) => {
     if (skipForCancellation) return true;
-
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
-
       const product = products.find(
         (p) => String(p.id) === String(item.productId),
       );
-
-      const requestedQty = Number(item.quantity) || 0;
-
+      const qty = Number(item.quantity) || 0;
       if (!product) {
-        setErrorMessage(`Select a product for item #${i + 1}`);
+        setErrorMessage(`Select product for item #${i + 1}`);
         return false;
       }
-
-      const availableStock = getEffectiveStock(product);
-
-      if (availableStock <= 0) {
-        setErrorMessage(`"${product.productName}" is out of stock`);
+      const stock = getEffectiveStock(product);
+      if (stock <= 0) {
+        setErrorMessage(`"${product.productName}" out of stock`);
         return false;
       }
-
-      if (requestedQty <= 0) {
-        setErrorMessage(`Enter a valid quantity for item #${i + 1}`);
+      if (qty <= 0) {
+        setErrorMessage(`Enter quantity for item #${i + 1}`);
         return false;
       }
-
-      if (requestedQty > availableStock) {
-        setErrorMessage(
-          `Only ${availableStock} of "${product.productName}" left in stock`,
-        );
+      if (qty > stock) {
+        setErrorMessage(`Only ${stock} left for "${product.productName}"`);
         return false;
       }
     }
-
     return true;
   };
 
-  const formatOrderItems = (rawItems) => {
-    return rawItems.map((item) => ({
-      product: {
-        id: Number(item.productId),
-      },
+  const formatOrderItems = (rawItems) =>
+    rawItems.map((item) => ({
+      product: {id: Number(item.productId)},
       quantity: Number(item.quantity),
       customerDiscountPercentage: Number(item.customerDiscountPercentage || 0),
     }));
+
+  const resolveStatus = (data) => {
+    if (isEditMode) return data.status;
+    return data.paymentStatus === "COMPLETE" ? "CONFIRMED" : "PENDING";
   };
 
-  // Payment fields sent to the API depending on Paid / Unpaid
-  const buildPaymentFields = (data) => {
-    if (data.paymentStatus === "PAID") {
+  const buildPaymentFields = (data) => ({
+    paymentDueDate: data.paymentDueDate || null,
+    installmentRequested: !isEditMode && data.paymentStatus === "INSTALLMENT",
+  });
+
+  const buildPaymentInfo = (data) => {
+    if (isEditMode) return null;
+    if (data.paymentStatus === "COMPLETE") {
+      const isCash = data.paymentMethod === "CASH";
       return {
-        paymentStatus: "PAID",
-        paymentPaidDate: data.paymentPaidDate || null,
-        paymentDueDate: null,
+        mode: "PAID",
+        paidDate: data.paymentPaidDate,
+        method: data.paymentMethod,
+        receivingAccountId: isCash ? null : data.receivingAccountId || null,
+        transactionReference: isCash
+          ? null
+          : String(data.transactionReference || "").trim() || null,
       };
     }
-
-    return {
-      paymentStatus: "UNPAID",
-      paymentDueDate: data.paymentDueDate || null,
-      paymentPaidDate: null,
-    };
+    return {mode: "INSTALLMENT"};
   };
 
   const validatePaymentDates = (data) => {
-    if (data.paymentStatus === "PAID") {
+    if (!isEditMode && data.paymentStatus === "COMPLETE") {
+      if (!data.paymentMethod) {
+        setErrorMessage("Select payment method");
+        return false;
+      }
       if (!data.paymentPaidDate) {
-        setErrorMessage("Select the payment paid date");
+        setErrorMessage("Select paid date");
         return false;
       }
-
       if (data.orderDate && data.paymentPaidDate < data.orderDate) {
-        setErrorMessage("Payment paid date cannot be before the order date");
+        setErrorMessage("Paid date cannot be before order date");
         return false;
       }
-
-      return true;
     }
-
-    if (
-      data.paymentDueDate &&
-      data.orderDate &&
-      data.paymentDueDate < data.orderDate
-    ) {
-      setErrorMessage("Payment due date cannot be before the order date");
-      return false;
-    }
-
     return true;
   };
 
   const calculateOverallTotals = () => {
-    let subtotal = 0;
-    let totalDiscount = 0;
-    let totalGst = 0;
-    let grandTotal = 0;
+    const totals = {
+      mrpTotal: 0,
+      mrpDiscount: 0,
+      extraDiscount: 0,
+      totalDiscount: 0,
+      taxable: 0,
+      totalGst: 0,
+      grandTotal: 0,
+    };
 
     (watchedItems || []).forEach((item) => {
       const product = products.find(
         (p) => String(p.id) === String(item?.productId),
       );
-
       if (!product) return;
 
-      const quantity = Number(item.quantity || 0);
-      const basePrice = Number(product.customerPrice || 0);
-      const discountPercentage = Math.max(
-        0,
-        Math.min(100, Number(item.customerDiscountPercentage || 0)),
+      const line = calcLine(
+        product,
+        item.quantity,
+        item.customerDiscountPercentage,
       );
-      const itemSubtotal = basePrice * quantity;
-      const itemDiscount = (itemSubtotal * discountPercentage) / 100;
-      const taxable = Math.max(0, itemSubtotal - itemDiscount);
-      const gstPercentage = product.gstApplicable
-        ? Number(product.totalGstPercentage || 0)
-        : 0;
-      const itemGst = (taxable * gstPercentage) / 100;
-
-      subtotal += itemSubtotal;
-      totalDiscount += itemDiscount;
-      totalGst += itemGst;
-      grandTotal += taxable + itemGst;
+      totals.mrpTotal += line.mrpTotal;
+      totals.mrpDiscount += line.mrpDiscount;
+      totals.extraDiscount += line.extraDiscount;
+      totals.totalDiscount += line.totalDiscount;
+      totals.taxable += line.taxable;
+      totals.totalGst += line.gst;
+      totals.grandTotal += line.total;
     });
 
-    return {subtotal, totalDiscount, totalGst, grandTotal};
+    return totals;
   };
 
   const overallTotals = calculateOverallTotals();
 
   const handleExistingOrderSubmit = async (data) => {
     setErrorMessage("");
-
-    const isCancellingEdit = isEditMode && data.status === "CANCELLED";
+    const isCancelling = isEditMode && data.status === "CANCELLED";
     data = {...data, orderItems: mergeDuplicateItems(data.orderItems)};
 
     if (
       !validateStockBeforeSubmit(data.orderItems, {
-        skipForCancellation: isCancellingEdit,
+        skipForCancellation: isCancelling,
       })
-    ) {
+    )
       return;
-    }
-
     if (customerType === "existing" && !data.customerId) {
       setErrorMessage("Select a customer");
       return;
     }
-
-    if (!validatePaymentDates(data)) {
-      return;
-    }
-
-    const orderPayload = {
-      orderDate: data.orderDate,
-      ...buildPaymentFields(data),
-      status: data.status,
-      customer: {
-        id: Number(data.customerId),
-      },
-      orderItems: formatOrderItems(data.orderItems),
-    };
+    if (!validatePaymentDates(data)) return;
 
     try {
       await onSubmitOrder(
-        orderPayload,
+        {
+          orderDate: data.orderDate,
+          ...buildPaymentFields(data),
+          status: resolveStatus(data),
+          customer: {id: Number(data.customerId)},
+          orderItems: formatOrderItems(data.orderItems),
+        },
         false,
         null,
         isEditMode ? editingOrder.id : null,
+        buildPaymentInfo(data),
       );
     } catch (error) {
       setErrorMessage(
@@ -361,51 +377,47 @@ const CreateOrderModal = ({
     }
   };
 
-  const handleNewCustomerCreate = async (newCustomerFormData) => {
+  const handleNewCustomerCreate = async (formData) => {
     if (isEditMode) {
-      setErrorMessage(
-        "A new customer cannot be created while editing an order",
-      );
+      setErrorMessage("Cannot add new customer while editing");
       return;
     }
-
     setErrorMessage("");
-    const currentOrderData = getValues();
-    currentOrderData.orderItems = mergeDuplicateItems(
-      currentOrderData.orderItems,
-    );
+    const current = getValues();
+    current.orderItems = mergeDuplicateItems(current.orderItems);
 
-    if (!validateStockBeforeSubmit(currentOrderData.orderItems)) {
+    if (!validateStockBeforeSubmit(current.orderItems)) {
       setIsNewCustomerModalOpen(false);
       return;
     }
-
-    if (!validatePaymentDates(currentOrderData)) {
+    if (!validatePaymentDates(current)) {
       setIsNewCustomerModalOpen(false);
       return;
     }
-
-    const customerPayload = {
-      customerName: newCustomerFormData.customerName,
-      landmark: newCustomerFormData.landmark,
-      city: newCustomerFormData.city,
-      taluka: newCustomerFormData.taluka,
-      pincode: newCustomerFormData.pincode,
-      email: newCustomerFormData.email,
-      phone: newCustomerFormData.phone,
-      state: newCustomerFormData.state,
-    };
-
-    const orderPartialPayload = {
-      orderDate: currentOrderData.orderDate,
-      ...buildPaymentFields(currentOrderData),
-      status: currentOrderData.status,
-      orderItems: formatOrderItems(currentOrderData.orderItems),
-    };
 
     try {
       setIsNewCustomerModalOpen(false);
-      await onSubmitOrder(orderPartialPayload, true, customerPayload);
+      await onSubmitOrder(
+        {
+          orderDate: current.orderDate,
+          ...buildPaymentFields(current),
+          status: resolveStatus(current),
+          orderItems: formatOrderItems(current.orderItems),
+        },
+        true,
+        {
+          customerName: formData.customerName,
+          landmark: formData.landmark,
+          city: formData.city,
+          taluka: formData.taluka,
+          pincode: formData.pincode,
+          email: formData.email,
+          phone: formData.phone,
+          state: formData.state,
+        },
+        null,
+        buildPaymentInfo(current),
+      );
     } catch (error) {
       setErrorMessage(
         error?.response?.data?.message ||
@@ -419,501 +431,506 @@ const CreateOrderModal = ({
 
   return (
     <>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
-        <div className="bg-white w-full max-w-6xl rounded-2xl shadow-2xl overflow-hidden border border-slate-100 flex flex-col max-h-[90vh]">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-3">
+        <div className="flex max-h-[95vh] w-full max-w-6xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl">
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 bg-blue-600">
-            <div>
-              <h3 className="text-xl font-bold text-white">
-                {isEditMode ? `Edit order #${editingOrder.id}` : "Create order"}
-              </h3>
-            </div>
-
+          <div className="flex items-center justify-between bg-blue-600 px-5 py-3">
+            <h2 className="text-lg font-semibold text-white">
+              {isEditMode ? `Edit Order #${editingOrder.id}` : "Create Order"}
+            </h2>
             <button
               type="button"
               onClick={handleModalClose}
-              title="Close"
-              className="p-2 rounded-lg text-white/90 hover:text-white hover:bg-white/20 transition cursor-pointer"
+              className="rounded-full p-1 text-white hover:bg-white/20"
             >
-              <X className="w-5 h-5" />
+              <X className="h-5 w-5" />
             </button>
           </div>
 
-          {/* Error Banner */}
           {errorMessage && (
-            <div className="mx-6 mt-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-700 text-sm">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              <span>{errorMessage}</span>
+            <div className="mx-5 mt-3 flex items-center gap-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+              <AlertCircle className="h-4 w-4" />
+              {errorMessage}
             </div>
           )}
 
           <form
             onSubmit={handleSubmit(handleExistingOrderSubmit)}
-            className="overflow-y-auto p-6 space-y-6"
+            className="flex-1 space-y-5 overflow-y-auto p-5"
           >
-            {/* Top Form Fields: Customer + Order Date */}
-            <div>
-              <h4 className="text-base font-bold text-slate-800">
-                Customer &amp; date
-              </h4>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end -mt-3">
-              {/* Column 1: Customer Type & Selector */}
-              <div className="space-y-2">
-                <Radio
-                  label="Customer type"
-                  name="customerType"
-                  register={register}
-                  error={errors.customerType}
-                  options={
-                    isEditMode
-                      ? [{label: "Existing customer", value: "existing"}]
-                      : [
-                          {label: "Existing customer", value: "existing"},
-                          {label: "New customer", value: "new"},
-                        ]
-                  }
-                  rules={{
-                    required: "Please select customer type",
-                    onChange: () => setErrorMessage(""),
-                  }}
-                />
-
-                {customerType === "existing" ? (
-                  <Select
-                    name="customerId"
-                    register={register}
-                    error={errors.customerId}
-                    disabled={loadingCustomers}
-                    placeholder={
-                      loadingCustomers
-                        ? "Loading customers..."
-                        : "Select customer"
-                    }
-                    options={customers.map((customer) => ({
-                      value: customer.id,
-                      label: `${customer.customerName} (${
-                        customer.city || customer.email || "No details"
-                      })`,
-                    }))}
-                    rules={{
-                      required: "Please select a customer",
-                    }}
-                  />
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const currentOrderData = getValues();
-                      if (
-                        validateStockBeforeSubmit(currentOrderData.orderItems)
-                      ) {
-                        setIsNewCustomerModalOpen(true);
+            {/* ========== Customer + Order Date (same line) ========== */}
+            <div className="grid grid-cols-1 items-end gap-4 md:grid-cols-12">
+              {/* Customer Type + Select */}
+              <div className="md:col-span-8">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+                  <div className="sm:w-40">
+                    <Radio
+                      label="Customer"
+                      name="customerType"
+                      register={register}
+                      error={errors.customerType}
+                      options={
+                        isEditMode
+                          ? [{label: "Existing", value: "existing"}]
+                          : [
+                              {label: "Existing", value: "existing"},
+                              {label: "New", value: "new"},
+                            ]
                       }
-                    }}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border-2 border-dashed border-emerald-500 bg-emerald-50 text-emerald-700 font-semibold text-sm hover:bg-emerald-100 transition cursor-pointer"
-                  >
-                    <UserPlus className="w-4 h-4" />
-                    Add new customer details
-                  </button>
-                )}
+                      rules={{
+                        required: "Required",
+                        onChange: () => setErrorMessage(""),
+                      }}
+                    />
+                  </div>
+
+                  <div className="flex-1">
+                    {customerType === "existing" ? (
+                      <Select
+                        name="customerId"
+                        register={register}
+                        error={errors.customerId}
+                        disabled={loadingCustomers}
+                        placeholder={
+                          loadingCustomers ? "Loading..." : "Select customer"
+                        }
+                        options={customers.map((c) => ({
+                          value: c.id,
+                          label: `${c.customerName}${c.city ? ` (${c.city})` : ""}`,
+                        }))}
+                        rules={{required: "Select customer"}}
+                      />
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (
+                            validateStockBeforeSubmit(getValues().orderItems)
+                          ) {
+                            setIsNewCustomerModalOpen(true);
+                          }
+                        }}
+                        className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-emerald-400 bg-emerald-50 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-100"
+                      >
+                        <UserPlus className="h-4 w-4" />
+                        Add New Customer
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
 
-              {/* Column 2: Order Date */}
-              <div>
+              {/* Order Date – same line */}
+              <div className="md:col-span-4">
                 <Input
-                  label="Order date"
+                  label="Order Date"
                   name="orderDate"
                   type="date"
                   register={register}
                   error={errors.orderDate}
                   required
-                  rules={{
-                    required: "Order date is required",
-                  }}
+                  rules={{required: "Required"}}
                 />
               </div>
             </div>
 
-            <hr className="border-slate-100" />
-
-            {/* Order Items Section */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="text-base font-bold text-slate-800">
-                    Order items
-                  </h4>
-                </div>
+            {/* ========== PRODUCTS ========== */}
+            <div className="rounded-xl border border-slate-200">
+              {/* Column headers */}
+              <div className="hidden grid-cols-12 gap-2 border-b bg-slate-50 px-4 py-2.5 text-[11px] font-semibold uppercase text-slate-500 md:grid">
+                <div className="col-span-1 text-center">Sr</div>
+                <div className="col-span-3">Product</div>
+                <div className="col-span-1 text-center">Qty</div>
+                <div className="col-span-1 text-center">MRP</div>
+                <div className="col-span-1 text-center">Sell</div>
+                <div className="col-span-1 text-center">Extra %</div>
+                <div className="col-span-2 text-center">Total</div>
+                <div className="col-span-2 text-center">Action</div>
               </div>
 
-              {/* Column Labels */}
-              <div className="hidden md:grid grid-cols-12 gap-3 px-4 text-[13px] font-semibold text-slate-600 items-center">
-                <span className="col-span-6">Product</span>
-                <span className="col-span-3">Quantity</span>
-                <span className="col-span-2">Discount %</span>
-                <span className="col-span-1 text-center">Remove</span>
-              </div>
+              {/* Products list */}
+              <div className="divide-y divide-slate-100">
+                {fields.map((field, index) => {
+                  const pid = watchedItems?.[index]?.productId;
+                  const product = products.find(
+                    (p) => String(p.id) === String(pid),
+                  );
+                  const qty = Number(watchedItems?.[index]?.quantity || 1);
+                  const stock = getEffectiveStock(product);
+                  const lowStock = product && qty > stock;
 
-              {/* Order Items List */}
-              {fields.map((field, index) => {
-                const selectedProductId = watchedItems?.[index]?.productId;
+                  const line = calcLine(
+                    product,
+                    qty,
+                    watchedItems?.[index]?.customerDiscountPercentage,
+                  );
+                  const {
+                    sell,
+                    mrp,
+                    extraPct,
+                    gstPct,
+                    mrpDiscount,
+                    extraDiscount: extraAmt,
+                    totalDiscount: totalSave,
+                    total,
+                  } = line;
+                  const mrpOff = product ? Math.max(0, mrp - sell) : 0; // per unit
+                  const mrpOffPct = mrp > 0 ? (mrpOff / mrp) * 100 : 0;
+                  const totalSavePct =
+                    line.mrpTotal > 0 ? (totalSave / line.mrpTotal) * 100 : 0;
 
-                const selectedProduct = products.find(
-                  (product) => String(product.id) === String(selectedProductId),
-                );
+                  return (
+                    <div
+                      key={field.id}
+                      className={`px-4 py-3 ${lowStock ? "bg-red-50/40" : ""}`}
+                    >
+                      <div className="grid grid-cols-1 items-center gap-2 md:grid-cols-12">
+                        {/* Sr No */}
+                        <div className="md:col-span-1">
+                          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-50 text-sm font-bold text-blue-700">
+                            {index + 1}
+                          </div>
+                        </div>
 
-                const quantity = Number(watchedItems?.[index]?.quantity || 1);
-                const availableStock = getEffectiveStock(selectedProduct);
-
-                const isStockInsufficient =
-                  selectedProduct && quantity > availableStock;
-
-                const storePrice = Number(
-                  selectedProduct?.customerPrice || selectedProduct?.price || 0,
-                );
-
-                const discountPercentage = Number(
-                  watchedItems?.[index]?.customerDiscountPercentage || 0,
-                );
-
-                const gstPercentage = selectedProduct?.gstApplicable
-                  ? Number(
-                      selectedProduct?.totalGstPercentage ||
-                        selectedProduct?.gstPercentage ||
-                        0,
-                    )
-                  : 0;
-
-                const lineSubtotal = storePrice * quantity;
-                const lineDiscount = (lineSubtotal * discountPercentage) / 100;
-                const taxableAmount = Math.max(0, lineSubtotal - lineDiscount);
-                const lineGst = (taxableAmount * gstPercentage) / 100;
-                const lineTotal = taxableAmount + lineGst;
-
-                return (
-                  <div
-                    key={field.id}
-                    className={`p-4 rounded-xl border transition-all space-y-3 ${
-                      isStockInsufficient
-                        ? "border-red-300 bg-red-50/50"
-                        : "border-slate-200 bg-white shadow-xs hover:border-slate-300"
-                    }`}
-                  >
-                    <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
-                      {/* Product Select */}
-                      <div className="md:col-span-6">
-                        <Select
-                          name={`orderItems.${index}.productId`}
-                          register={register}
-                          error={errors.orderItems?.[index]?.productId}
-                          disabled={loadingProducts}
-                          placeholder={
-                            loadingProducts
-                              ? "Loading products..."
-                              : "Select product"
-                          }
-                          options={products.map((product) => ({
-                            value: product.id,
-                            label: `${product.productName} (${getEffectiveStock(
-                              product,
-                            )} in stock)`,
-                            disabled: getEffectiveStock(product) <= 0,
-                          }))}
-                          rules={{
-                            required: "Please select a product",
-                            onChange: (event) => {
-                              const product = products.find(
-                                (p) =>
-                                  String(p.id) === String(event.target.value),
-                              );
-                              if (product) {
-                                const items = getValues("orderItems") || [];
-                                const sameIndex = items.findIndex(
-                                  (it, i) =>
-                                    i !== index &&
-                                    String(it.productId) === String(product.id),
+                        {/* Product */}
+                        <div className="md:col-span-3">
+                          <Select
+                            name={`orderItems.${index}.productId`}
+                            register={register}
+                            error={errors.orderItems?.[index]?.productId}
+                            disabled={loadingProducts}
+                            placeholder={
+                              loadingProducts ? "Loading..." : "Select product"
+                            }
+                            options={products.map((p) => ({
+                              value: p.id,
+                              label: p.productName,
+                              disabled: getEffectiveStock(p) <= 0,
+                            }))}
+                            rules={{
+                              required: "Required",
+                              onChange: (e) => {
+                                const p = products.find(
+                                  (x) =>
+                                    String(x.id) === String(e.target.value),
                                 );
-                                if (sameIndex >= 0) {
-                                  // Already in the order: add this line's quantity there.
-                                  const addQty =
-                                    Number(items[index]?.quantity) || 1;
-                                  setValue(
-                                    `orderItems.${sameIndex}.quantity`,
-                                    (Number(items[sameIndex].quantity) || 0) +
-                                      addQty,
+                                if (p) {
+                                  const items = getValues("orderItems") || [];
+                                  const same = items.findIndex(
+                                    (it, i) =>
+                                      i !== index &&
+                                      String(it.productId) === String(p.id),
                                   );
-                                  // remove after RHF finishes handling this change event
-                                  if (items.length > 1)
-                                    setTimeout(() => remove(index), 0);
-                                } else {
-                                  setValue(
-                                    `orderItems.${index}.customerDiscountPercentage`,
-                                    0,
-                                  );
-                                }
-                              }
-                              setErrorMessage("");
-                            },
-                          }}
-                        />
-                      </div>
-
-                      {/* Quantity Input */}
-                      <div className="md:col-span-3">
-                        <Input
-                          name={`orderItems.${index}.quantity`}
-                          type="number"
-                          placeholder="Qty"
-                          register={register}
-                          error={errors.orderItems?.[index]?.quantity}
-                          className={
-                            isStockInsufficient ? "border-red-500" : ""
-                          }
-                          rules={{
-                            required: "Quantity is required",
-                            min: {
-                              value: 1,
-                              message: "Minimum quantity is 1",
-                            },
-                            max:
-                              availableStock > 0
-                                ? {
-                                    value: availableStock,
-                                    message: `Only ${availableStock} available`,
+                                  if (same >= 0) {
+                                    const add =
+                                      Number(items[index]?.quantity) || 1;
+                                    setValue(
+                                      `orderItems.${same}.quantity`,
+                                      (Number(items[same].quantity) || 0) + add,
+                                    );
+                                    if (items.length > 1)
+                                      setTimeout(() => remove(index), 0);
+                                  } else {
+                                    setValue(
+                                      `orderItems.${index}.customerDiscountPercentage`,
+                                      0,
+                                    );
                                   }
-                                : undefined,
-                          }}
-                        />
-                      </div>
+                                }
+                                setErrorMessage("");
+                              },
+                            }}
+                          />
+                        </div>
 
-                      {/* Discount % Input */}
-                      <div className="md:col-span-2">
-                        <Input
-                          name={`orderItems.${index}.customerDiscountPercentage`}
-                          type="number"
-                          placeholder="Discount %"
-                          register={register}
-                          error={
-                            errors.orderItems?.[index]
-                              ?.customerDiscountPercentage
-                          }
-                          rules={{
-                            min: {
-                              value: 0,
-                              message: "Discount cannot be negative",
-                            },
-                            max: {
-                              value: 100,
-                              message: "Maximum discount is 100%",
-                            },
-                          }}
-                        />
-                      </div>
+                        {/* Qty */}
+                        <div className="md:col-span-1">
+                          <Input
+                            name={`orderItems.${index}.quantity`}
+                            type="number"
+                            register={register}
+                            error={errors.orderItems?.[index]?.quantity}
+                            className={lowStock ? "border-red-400" : ""}
+                            rules={{
+                              required: "Req",
+                              min: {value: 1, message: "Min 1"},
+                              max:
+                                stock > 0
+                                  ? {value: stock, message: `Max ${stock}`}
+                                  : undefined,
+                            }}
+                          />
+                        </div>
 
-                      {/* Line Item Remove Action */}
-                      <div className="md:col-span-1 flex items-center justify-center">
-                        {fields.length > 1 ? (
+                        {/* MRP */}
+                        <div className="md:col-span-1">
+                          <div className="rounded border border-slate-200 bg-slate-50 px-2 py-1.5 text-center text-sm">
+                            {product ? `₹${mrp.toFixed(0)}` : "—"}
+                          </div>
+                        </div>
+
+                        {/* Sell */}
+                        <div className="md:col-span-1">
+                          <div className="rounded border border-slate-200 bg-slate-50 px-2 py-1.5 text-center text-sm">
+                            {product ? `₹${sell.toFixed(0)}` : "—"}
+                          </div>
+                        </div>
+
+                        {/* Extra % */}
+                        <div className="md:col-span-1">
+                          <Input
+                            name={`orderItems.${index}.customerDiscountPercentage`}
+                            type="number"
+                            register={register}
+                            error={
+                              errors.orderItems?.[index]
+                                ?.customerDiscountPercentage
+                            }
+                            rules={{
+                              min: {value: 0, message: "0"},
+                              max: {value: 100, message: "100"},
+                            }}
+                          />
+                        </div>
+
+                        {/* Total */}
+                        <div className="md:col-span-2">
+                          <div className="rounded border border-blue-200 bg-blue-50 px-2 py-1.5 text-center text-sm font-bold text-blue-700">
+                            {product
+                              ? `₹${total.toLocaleString("en-IN", {
+                                  maximumFractionDigits: 0,
+                                })}`
+                              : "—"}
+                          </div>
+                        </div>
+
+                        {/* Action = Delete + Add */}
+                        <div className="flex items-center justify-center gap-1 md:col-span-2">
+                          {fields.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => remove(index)}
+                              className="rounded-lg bg-red-50 p-2 text-red-500 hover:bg-red-100"
+                              title="Delete"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          )}
                           <button
                             type="button"
-                            onClick={() => remove(index)}
-                            title="Remove item"
-                            className="flex h-9 w-9 items-center justify-center text-red-500 bg-red-50 hover:bg-red-100 rounded-lg transition cursor-pointer"
+                            onClick={() =>
+                              insert(index + 1, {
+                                productId: "",
+                                quantity: 1,
+                                customerDiscountPercentage: 0,
+                              })
+                            }
+                            className="rounded-lg bg-blue-50 p-2 text-blue-600 hover:bg-blue-100"
+                            title="Add product"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Plus className="h-4 w-4" />
                           </button>
-                        ) : (
-                          <span
-                            className="p-2 w-9 h-9"
-                            aria-hidden="true"
-                          />
-                        )}
+                        </div>
                       </div>
-                    </div>
 
-                    {/* Calculated Product Specs Bar */}
-                    {selectedProduct && (
-                      <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-sm">
-                        <div className="flex items-center gap-2 text-slate-500">
-                          <Package className="w-3.5 h-3.5 text-blue-500" />
-                          <span>Available: {availableStock}</span>
-                          <span>•</span>
+                      {/* Info line */}
+                      {product && (
+                        <div className="mt-1.5 flex flex-wrap gap-x-4 pl-10 text-[11px] text-slate-500">
                           <span>
-                            MRP: ₹
-                            {Number(selectedProduct?.productMrp || 0).toFixed(
-                              2,
-                            )}
+                            Stock: <b>{stock}</b>
                           </span>
-                          <span>•</span>
-                          <span>Sell price: ₹{storePrice.toFixed(2)}</span>
-                          {gstPercentage > 0 && (
-                            <>
-                              <span>•</span>
-                              <span>GST: {gstPercentage}%</span>
-                            </>
+                          {mrpDiscount > 0 && (
+                            <span className="text-emerald-600">
+                              MRP off {rupees(mrpOff)}/unit ={" "}
+                              {rupees(mrpDiscount)} ({mrpOffPct.toFixed(1)}%)
+                            </span>
                           )}
+                          {extraAmt > 0 && (
+                            <span className="text-amber-600">
+                              Extra {extraPct}% = {rupees(extraAmt)}
+                            </span>
+                          )}
+                          {totalSave > 0 && (
+                            <span className="font-semibold text-emerald-700">
+                              Total discount {rupees(totalSave)} (
+                              {totalSavePct.toFixed(1)}%)
+                            </span>
+                          )}
+                          {gstPct > 0 && <span>GST {gstPct}%</span>}
                         </div>
-
-                        <div className="font-bold text-blue-700 bg-blue-50 border border-blue-100 px-3 py-1 rounded-full">
-                          Line total: ₹
-                          {lineTotal.toLocaleString("en-IN", {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                          })}
-                        </div>
-                      </div>
-                    )}
-
-                    {isStockInsufficient && (
-                      <p className="text-sm text-red-600 font-medium">
-                        Only {availableStock} units are available in stock.
-                      </p>
-                    )}
-                  </div>
-                );
-              })}
-
-              <button
-                type="button"
-                onClick={() =>
-                  append({
-                    productId: "",
-                    quantity: 1,
-                    customerDiscountPercentage: 0,
-                  })
-                }
-                className="w-full flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-blue-300 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-blue-700 transition hover:bg-blue-100 cursor-pointer"
-              >
-                <Plus className="h-4 w-4" />
-                Add another item
-              </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
 
-            <hr className="border-slate-100" />
-
-            {/* Below Order Items: Paid / Unpaid, then Payment Date + Order Status on the same line */}
-            <div className="space-y-4">
-              <div>
-                <h4 className="text-base font-bold text-slate-800">
-                  Payment &amp; status
-                </h4>
-              </div>
-              <Radio
-                label="Payment"
-                name="paymentStatus"
-                register={register}
-                error={errors.paymentStatus}
-                options={[
-                  {label: "Paid", value: "PAID"},
-                  {label: "Unpaid", value: "UNPAID"},
-                ]}
-                rules={{
-                  required: "Please select payment status",
-                  onChange: () => {
-                    // Clear the other date when switching
-                    setValue("paymentDueDate", "");
-                    setValue("paymentPaidDate", "");
-                    setErrorMessage("");
-                  },
-                }}
+            {/* ========== CALCULATIONS ========== */}
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+              <StatCard
+                label="MRP Total"
+                value={rupees(overallTotals.mrpTotal)}
+                tone="slate"
               />
+              <StatCard
+                label="MRP Discount"
+                value={`-${rupees(overallTotals.mrpDiscount)}`}
+                tone="emerald"
+              />
+              <StatCard
+                label="Extra Discount"
+                value={`-${rupees(overallTotals.extraDiscount)}`}
+                tone="amber"
+              />
+              <StatCard
+                label="Total Discount"
+                value={`-${rupees(overallTotals.totalDiscount)}${
+                  overallTotals.mrpTotal > 0
+                    ? ` (${(
+                        (overallTotals.totalDiscount / overallTotals.mrpTotal) *
+                        100
+                      ).toFixed(1)}%)`
+                    : ""
+                }`}
+                tone="rose"
+              />
+              <StatCard
+                label="GST"
+                value={`+${rupees(overallTotals.totalGst)}`}
+                tone="violet"
+              />
+              <StatCard
+                label="Grand Total"
+                value={rupees(overallTotals.grandTotal)}
+                tone="blue"
+              />
+            </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-                {/* Left: Payment date (Paid Date / Due Date) */}
-                <div>
-                  {paymentStatus === "PAID" ? (
+            {/* ========== PAYMENT ========== */}
+            <div className="rounded-xl border border-slate-200 p-4">
+              <h3 className="mb-3 text-sm font-semibold text-slate-700">
+                Payment
+              </h3>
+
+              <div
+                className={`grid grid-cols-1 gap-3 ${
+                  !isEditMode && paymentStatus === "COMPLETE"
+                    ? "sm:grid-cols-2 lg:grid-cols-4"
+                    : "sm:grid-cols-2"
+                }`}
+              >
+                {!isEditMode && (
+                  <Select
+                    label="Payment Status"
+                    name="paymentStatus"
+                    register={register}
+                    error={errors.paymentStatus}
+                    options={[
+                      {label: "Complete", value: "COMPLETE"},
+                      {label: "Installment", value: "INSTALLMENT"},
+                    ]}
+                    rules={{
+                      required: "Required",
+                      onChange: () => {
+                        setValue("paymentPaidDate", "");
+                        setValue("paymentMethod", "CASH");
+                        setValue("receivingAccountId", "");
+                        setValue("transactionReference", "");
+                        setErrorMessage("");
+                      },
+                    }}
+                  />
+                )}
+
+                {!isEditMode && paymentStatus === "COMPLETE" && (
+                  <>
                     <Input
-                      label="Paid date"
+                      label="Paid Date"
                       name="paymentPaidDate"
                       type="date"
                       register={register}
                       error={errors.paymentPaidDate}
                       required
                       rules={{
-                        required: "Payment paid date is required",
-                        validate: (value, formValues) =>
-                          !value ||
-                          !formValues.orderDate ||
-                          value >= formValues.orderDate ||
-                          "Paid date cannot be before order date",
+                        required: "Required",
+                        validate: (v, f) =>
+                          !v ||
+                          !f.orderDate ||
+                          v >= f.orderDate ||
+                          "Before order date",
                       }}
                     />
-                  ) : (
-                    <Input
-                      label="Due date"
-                      name="paymentDueDate"
-                      type="date"
+                    <Select
+                      label="Method"
+                      name="paymentMethod"
                       register={register}
-                      error={errors.paymentDueDate}
+                      error={errors.paymentMethod}
+                      options={PAYMENT_METHOD_OPTIONS}
                       rules={{
-                        validate: (value, formValues) =>
-                          !value ||
-                          !formValues.orderDate ||
-                          value >= formValues.orderDate ||
-                          "Due date cannot be before order date",
+                        required: "Required",
+                        onChange: (e) => {
+                          if (e.target.value === "CASH") {
+                            setValue("receivingAccountId", "");
+                            setValue("transactionReference", "");
+                          }
+                          setErrorMessage("");
+                        },
                       }}
                     />
-                  )}
-                </div>
+                    {!isCashPayment && (
+                      <Select
+                        label="Account"
+                        name="receivingAccountId"
+                        register={register}
+                        error={errors.receivingAccountId}
+                        allowEmpty
+                        placeholder="Optional"
+                        options={receivingAccounts.map((a) => ({
+                          value: a.id,
+                          label: a.accountName || a.bankName,
+                        }))}
+                      />
+                    )}
+                  </>
+                )}
 
-                {/* Right: Order Status */}
-                <div>
+                {isEditMode && (
                   <Select
-                    label="Order status"
+                    label="Status"
                     name="status"
                     register={register}
                     error={errors.status}
-                    options={
-                      isEditMode
-                        ? [
-                            {label: "Pending", value: "PENDING"},
-                            {label: "Confirmed", value: "CONFIRMED"},
-                            {label: "Cancelled", value: "CANCELLED"},
-                          ]
-                        : [
-                            {label: "Pending", value: "PENDING"},
-                            {label: "Confirmed", value: "CONFIRMED"},
-                          ]
-                    }
+                    options={[
+                      {label: "Pending", value: "PENDING"},
+                      {label: "Confirmed", value: "CONFIRMED"},
+                      {label: "Cancelled", value: "CANCELLED"},
+                    ]}
                   />
-                </div>
+                )}
               </div>
+
+              {!isEditMode &&
+                paymentStatus === "COMPLETE" &&
+                !isCashPayment && (
+                  <div className="mt-3 max-w-sm">
+                    <Input
+                      label="Transaction ID"
+                      name="transactionReference"
+                      placeholder="UTR / Cheque"
+                      register={register}
+                      error={errors.transactionReference}
+                    />
+                  </div>
+                )}
             </div>
 
-            {/* Financial Summary (same card design as the list pages) */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-              <StatCard
-                label="Subtotal"
-                value={`₹${overallTotals.subtotal.toFixed(2)}`}
-                tone="slate"
-              />
-              <StatCard
-                label="Discount"
-                value={`-₹${overallTotals.totalDiscount.toFixed(2)}`}
-                tone="emerald"
-              />
-              <StatCard
-                label="GST"
-                value={`+₹${overallTotals.totalGst.toFixed(2)}`}
-                tone="violet"
-              />
-              <StatCard
-                label="Grand total"
-                value={`₹${overallTotals.grandTotal.toLocaleString("en-IN", {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}`}
-                tone="blue"
-              />
-            </div>
-
-            {/* Modal Actions */}
-            <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+            {/* Actions */}
+            <div className="flex justify-end gap-3 border-t pt-4">
               <button
                 type="button"
                 onClick={handleModalClose}
                 disabled={isSubmitting}
-                className="h-10 px-5 rounded-lg border border-slate-300 bg-white text-slate-700 text-sm font-semibold hover:bg-slate-50 disabled:opacity-50 transition cursor-pointer"
+                className="rounded-lg border border-slate-300 px-5 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
               >
                 Cancel
               </button>
@@ -922,32 +939,32 @@ const CreateOrderModal = ({
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="h-10 px-6 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition cursor-pointer shadow-sm"
+                  className="rounded-lg bg-blue-600 px-6 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
                 >
                   {isSubmitting
                     ? isEditMode
                       ? "Updating..."
                       : "Creating..."
                     : isEditMode
-                      ? "Update order"
-                      : "Create order"}
+                      ? "Update Order"
+                      : "Create Order"}
                 </button>
               ) : (
                 <button
                   type="button"
                   disabled={isSubmitting}
                   onClick={() => {
-                    const currentOrderData = getValues();
+                    const d = getValues();
                     if (
-                      validateStockBeforeSubmit(currentOrderData.orderItems) &&
-                      validatePaymentDates(currentOrderData)
+                      validateStockBeforeSubmit(d.orderItems) &&
+                      validatePaymentDates(d)
                     ) {
                       setIsNewCustomerModalOpen(true);
                     }
                   }}
-                  className="h-10 px-6 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 disabled:opacity-50 transition cursor-pointer shadow-sm"
+                  className="rounded-lg bg-emerald-600 px-6 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
                 >
-                  Continue to add customer
+                  Continue
                 </button>
               )}
             </div>
@@ -955,7 +972,6 @@ const CreateOrderModal = ({
         </div>
       </div>
 
-      {/* New Customer Modal */}
       <CustomerModal
         isOpen={isNewCustomerModalOpen}
         onClose={() => setIsNewCustomerModalOpen(false)}

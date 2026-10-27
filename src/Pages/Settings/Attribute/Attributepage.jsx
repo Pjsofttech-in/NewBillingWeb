@@ -1,7 +1,7 @@
 import {useState} from "react";
 import {useNavigate, useParams} from "react-router-dom";
 import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
-import {ArrowLeft, Plus, Tags, Loader2, AlertCircle} from "lucide-react";
+import {ArrowLeft, Plus, Loader2, AlertCircle} from "lucide-react";
 
 import {fetchProductTypes} from "../../../api/productTypeServiceApi";
 import {
@@ -35,6 +35,7 @@ export default function AttributePage() {
   const productType = Array.isArray(productTypes)
     ? productTypes.find((pt) => String(pt.id) === String(productTypeId))
     : null;
+  // eslint-disable-next-line no-unused-vars
   const typeName =
     productType?.typeName ||
     productType?.productType ||
@@ -80,7 +81,7 @@ export default function AttributePage() {
   const paginated = attributes.slice(startIndex, startIndex + itemsPerPage);
 
   return (
-    <div className="w-full space-y-4 px-2 py-2 sm:px-4 sm:py-4">
+    <div className="w-full space-y-2 px-2 py-2 sm:px-4 sm:py-1">
       {toast && (
         <Toast
           message={toast.message}
@@ -89,76 +90,51 @@ export default function AttributePage() {
         />
       )}
 
-      {/* Header */}
-      <div className="flex flex-col gap-3 border-b border-slate-200 pb-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => navigate(-1)}
-            className="flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back
-          </button>
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-purple-200/50 bg-purple-100/60 text-purple-600">
-              <Tags className="h-4 w-4" />
-            </div>
-            <div>
-              <h1 className="text-base font-bold leading-tight text-slate-900">
-                Product Attributes
-              </h1>
-              <p className="text-xs text-slate-500">
-                Product Type:{" "}
-                <span className="font-semibold text-purple-600">
-                  {typeName}
-                </span>
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <span className="w-fit rounded-full border border-purple-200 bg-purple-50 px-3 py-1.5 text-xs font-bold text-purple-700">
-          Total : {totalItems}
-        </span>
-      </div>
-
-      {/* Add form */}
+      {/* One-line header: Back | Input | Add | Count */}
       <form
         onSubmit={submit}
-        className="space-y-2.5 rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+        className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm"
       >
-        <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-500">
-          <Plus className="h-3.5 w-3.5 text-purple-600" /> Add New Attribute
-        </div>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            required
-            placeholder="Attribute name (e.g. Size, Color) *"
-            className="h-9 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-800 placeholder-slate-400 outline-none transition-all focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20"
-          />
-          <button
-            type="submit"
-            disabled={addMutation.isPending}
-            className="flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white shadow-sm transition-all hover:bg-blue-700 disabled:opacity-50"
-          >
-            {addMutation.isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Plus className="h-4 w-4" />
-            )}
-            {addMutation.isPending ? "Adding..." : "Add Attribute"}
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => navigate(-1)}
+          className="flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back
+        </button>
+
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          required
+          placeholder="Attribute name (e.g. Size, Color) *"
+          className="h-9 min-w-48 flex-1 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-800 placeholder-slate-400 outline-none transition-all focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20"
+        />
+
+        <button
+          type="submit"
+          disabled={addMutation.isPending}
+          className="flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white shadow-sm transition-all hover:bg-blue-700 disabled:opacity-50"
+        >
+          {addMutation.isPending ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Plus className="h-4 w-4" />
+          )}
+          {addMutation.isPending ? "Adding..." : "Add Attribute"}
+        </button>
+
+        <span className="rounded-full border border-purple-200 bg-purple-50 px-3 py-1.5 text-xs font-bold text-purple-700">
+          Total : {totalItems}
+        </span>
       </form>
 
       {/* Table */}
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full min-w-100 text-xs text-slate-700 sm:text-sm">
-            <thead className="bg-slate-100 text-[11px] font-bold uppercase tracking-wider text-black">
+            <thead className="text-[11px] font-bold uppercase tracking-wider bg-blue-400 text-white">
               <tr>
                 <th className="px-4 py-3 text-left">S.No.</th>
                 <th className="px-4 py-3 text-left">Attribute Name</th>

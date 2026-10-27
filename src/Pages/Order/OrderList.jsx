@@ -1,16 +1,9 @@
 import {useMemo, useState} from "react";
 import {useQuery} from "@tanstack/react-query";
-import {
-  CalendarClock,
-  Plus,
-  Printer,
-  SearchX,
-  Trash2,
-  Truck,
-  X,
-} from "lucide-react";
+import {Plus, Printer, SearchX, Trash2, Truck, X} from "lucide-react";
 
-import {fetchOrdersGstSummary, exportOrders} from "../../api/orderApi";
+import {exportOrders} from "../../api/orderApi";
+import {orderInstallmentApi} from "../../api/installmentApi";
 import DeleteConfirmModal from "../../Components/DeleteConfirmModal";
 import StatCard from "./StatCard";
 import Pagination from "../../Components/Pagination";
@@ -19,18 +12,13 @@ import Input from "../../Components/Form/Input";
 import Select from "../../Components/Form/Select";
 import SearchBar from "../../Components/SearchBar";
 import ExportButtons from "../../Components/ExportButtons";
-import {getTodayString} from "../../utils/dateRange";
 import {
   INITIAL_ORDER_FILTERS,
   toOrderQuery,
   isInvalidOrderRange,
 } from "../../utils/orderFilters";
+import {moneyAuto as money} from "../../utils/format";
 
-const money = (value) =>
-  `₹${Number(value || 0).toLocaleString("en-IN", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  })}`;
 
 const methods = ["CASH", "UPI", "CREDIT_CARD", "DEBIT_CARD", "NET_BANKING"];
 
@@ -49,47 +37,39 @@ const toSentence = (value) =>
 
 const BADGE = "inline-block rounded-full px-2.5 py-1 text-xs font-semibold";
 
-const getPaymentStatusStyle = (status, paidAmount, pendingAmount) => {
-  if (status === "OVERDUE") {
-    return "bg-red-100 text-red-700";
+const getPaymentDisplay = (order, paidAmount, pendingAmount) => {
+  if (order.installmentsComplete || pendingAmount <= 0.009) {
+    return {
+      label: "Complete",
+      style: "bg-emerald-100 text-emerald-700",
+      opensInstallments: Boolean(order.hasInstallmentPlan),
+    };
   }
 
-  if (pendingAmount <= 0.009) {
-    return "bg-emerald-100 text-emerald-700";
+  if (order.hasInstallmentPlan || order.installmentRequested) {
+    return {
+      label: "Installment",
+      style: "bg-violet-100 text-violet-700",
+      opensInstallments: true,
+    };
   }
 
   if (paidAmount > 0) {
-    return "bg-blue-100 text-blue-700";
+    return {label: "Partial", style: "bg-blue-100 text-blue-700"};
   }
 
-  return "bg-amber-100 text-amber-700";
+  return {label: "Pending", style: "bg-amber-100 text-amber-700"};
 };
 
-const getOrderStatusStyle = (status) => {
-  switch (status) {
-    case "DELIVERED":
-      return "bg-emerald-100 text-emerald-700";
-    case "SHIPPED":
-      return "bg-blue-100 text-blue-700";
-    case "CONFIRMED":
-      return "bg-blue-100 text-blue-700";
-    case "CANCELLED":
-      return "bg-red-100 text-red-700";
-    default:
-      return "bg-amber-100 text-amber-700";
-  }
-};
-
-const isOverdueOrder = (order, pendingAmount) => {
-  if (pendingAmount <= 0.009 || !order.paymentDueDate) {
-    return false;
-  }
-
-  if (order.paymentOverdue === true) {
-    return true;
-  }
-
-  return String(order.paymentDueDate).slice(0, 10) < getTodayString();
+// Due date shown for an order:
+//  - paid in installments -> the due date of the NEXT unpaid installment
+//    (first installment -> its date; once it is paid -> the second one, and so on; "—" when all are paid)
+//  - otherwise            -> the order's own due date
+// nextDueByOrder = {orderId: earliest unpaid installment due date}, loaded in OrderList below.
+const getDueDate = (order, nextDueByOrder) => {
+  if (nextDueByOrder?.[order.id]) return nextDueByOrder[order.id];
+  if (order.hasInstallmentPlan) return order.nextInstallmentDueDate;
+  return order.paymentDueDate;
 };
 
 const LOCKED_STATUSES = ["SHIPPED", "DELIVERED", "CANCELLED"];
@@ -126,13 +106,29 @@ const CustomerNameButton = ({order, onOpenEdit, className = ""}) => {
   );
 };
 
-// Same action buttons for the table row and the mobile card.
+// Payment status badge. "Installment" / "Complete" are buttons that open the installment window.
+const PaymentBadge = ({order, display, onOpenInstallments, className = ""}) => {
+  const classes = `${BADGE} ${display.style} ${className}`;
 
+  if (!display.opensInstallments) {
+    return <span className={classes}>{display.label}</span>;
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => onOpenInstallments(order)}
+      title="Open installment plan"
+      className={`${classes} cursor-pointer underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400`}
+    >
+      {display.label}
+    </button>
+  );
+};
+
+// Same action buttons for the table row and the mobile card.
 const OrderActions = ({
   order,
-  isFullyPaid,
-  onOpenPayment,
-  onOpenInstallments,
   onPrintInvoice,
   onCreateShipment,
   onRequestDelete,
@@ -141,28 +137,6 @@ const OrderActions = ({
 
   return (
     <div className="flex items-center justify-center gap-1">
-      <button
-        type="button"
-        onClick={() => onOpenPayment(order)}
-        disabled={isFullyPaid}
-        title={isFullyPaid ? "Fully paid" : "Make payment"}
-        className="h-7 cursor-pointer rounded-lg bg-blue-600 px-2 text-[11px] font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
-      >
-        {isFullyPaid ? "Paid" : "Pay"}
-      </button>
-
-      <button
-        type="button"
-        onClick={() => onOpenInstallments(order)}
-        disabled={order.status === "CANCELLED"}
-        title="Installment plan"
-        aria-label="Installment plan"
-        className="flex h-7 cursor-pointer items-center gap-1 rounded-lg bg-amber-50 px-2 text-[11px] font-semibold text-amber-700 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-40"
-      >
-        <CalendarClock className="h-3.5 w-3.5" />
-        Installments
-      </button>
-
       <button
         type="button"
         onClick={() => onPrintInvoice(order)}
@@ -218,13 +192,6 @@ export default function OrderList({
   const [deleteOrder, setDeleteOrder] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const {data: gstSummary, isLoading: loadingGstSummary} = useQuery({
-    queryKey: ["orders-gst-summary"],
-    queryFn: fetchOrdersGstSummary,
-    staleTime: 30 * 1000,
-    retry: 1,
-  });
-
   const updateFilter = (key, value) => {
     onFiltersChange((previous) => ({
       ...previous,
@@ -248,6 +215,29 @@ export default function OrderList({
   const handleExport = (format) => exportOrders(format, toOrderQuery(filters));
 
   const pagination = usePagination(filteredOrders, 25, JSON.stringify(filters));
+
+  // Next unpaid installment date of every order on a plan (one request for the whole list).
+  // The key starts with "orders" so it refreshes together with the order list whenever an
+  // installment plan is created or an installment is paid.
+  const {data: openInstallments = []} = useQuery({
+    queryKey: ["orders", "installment-due-dates"],
+    queryFn: () =>
+      orderInstallmentApi.fetchDue({overdueOnly: false, days: 36500}),
+    retry: false,
+  });
+
+  const nextDueByOrder = useMemo(() => {
+    const map = {};
+    for (const item of Array.isArray(openInstallments)
+      ? openInstallments
+      : []) {
+      const current = map[item.referenceId];
+      if (item.dueDate && (!current || item.dueDate < current)) {
+        map[item.referenceId] = item.dueDate;
+      }
+    }
+    return map;
+  }, [openInstallments]);
 
   // Totals of the orders currently listed (follows the filters, cancelled excluded).
   const listTotals = useMemo(() => {
@@ -288,17 +278,12 @@ export default function OrderList({
   const describeOrder = (order) => {
     const paidAmount = getPaidAmount(order);
     const pendingAmount = getPendingAmount(order);
-    const isFullyPaid = pendingAmount <= 0.009;
-    const paymentStatus =
-      order.paymentStatus ||
-      (isFullyPaid ? "PAID" : paidAmount > 0 ? "PARTIAL" : "UNPAID");
 
     return {
       paidAmount,
       pendingAmount,
-      isFullyPaid,
-      paymentStatus,
-      overdue: isOverdueOrder(order, pendingAmount),
+      isFullyPaid: pendingAmount <= 0.009,
+      paymentDisplay: getPaymentDisplay(order, paidAmount, pendingAmount),
     };
   };
 
@@ -324,7 +309,7 @@ export default function OrderList({
 
       {/* 1) Filters, then total count + action buttons */}
       <div className="w-full space-y-2 rounded-lg border border-slate-200 bg-white p-2.5 shadow-xs">
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
           <SearchBar
             value={filters.search}
             onChange={(text) => updateFilter("search", text)}
@@ -332,25 +317,7 @@ export default function OrderList({
             ariaLabel="Search orders"
           />
 
-          <Select
-            name="status"
-            placeholder="Status"
-            allowEmpty
-            register={(name) => ({
-              value: filters[name],
-              onChange: (event) => updateFilter(name, event.target.value),
-            })}
-            options={[
-              "PENDING",
-              "CONFIRMED",
-              "SHIPPED",
-              "DELIVERED",
-              "CANCELLED",
-            ].map((status) => ({
-              value: status,
-              label: toSentence(status),
-            }))}
-          />
+          {/* Status filter removed */}
 
           <Select
             name="timeframe"
@@ -455,33 +422,31 @@ export default function OrderList({
         </div>
       </div>
 
-      {/* 2) Summary cards (all orders, cancelled orders excluded) */}
+      {/* 2) Summary cards */}
       <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
         <StatCard
-          label="Total order amount"
-          value={money(gstSummary?.totalOrderAmount)}
+          label={hasActiveFilters ? "Order Amount" : "Order Amount"}
+          value={money(listTotals.total)}
           tone="blue"
-          loading={loadingGstSummary}
+          loading={isLoading}
         />
         <StatCard
-          label="Total paid"
-          value={money(gstSummary?.totalPaidAmount)}
+          label={hasActiveFilters ? "Paid" : "Paid"}
+          value={money(listTotals.paid)}
           tone="emerald"
-          loading={loadingGstSummary}
+          loading={isLoading}
         />
         <StatCard
-          label="Total pending"
-          value={money(gstSummary?.totalPendingAmount)}
-          tone={
-            Number(gstSummary?.totalOverdueAmount || 0) > 0 ? "rose" : "amber"
-          }
-          loading={loadingGstSummary}
+          label={hasActiveFilters ? "Pending" : "Pending"}
+          value={money(listTotals.pending)}
+          tone="amber"
+          loading={isLoading}
         />
         <StatCard
-          label="Total GST"
-          value={money(gstSummary?.totalGstAmount)}
+          label={hasActiveFilters ? "GST" : "GST"}
+          value={money(listTotals.gst)}
           tone="violet"
-          loading={loadingGstSummary}
+          loading={isLoading}
         />
       </div>
 
@@ -511,20 +476,13 @@ export default function OrderList({
           {/* MOBILE CARD VIEW */}
           <div className="grid grid-cols-1 gap-3 p-1 sm:grid-cols-2 lg:hidden">
             {pagination.paginatedData.map((order) => {
-              const {
-                paidAmount,
-                pendingAmount,
-                isFullyPaid,
-                paymentStatus,
-                overdue,
-              } = describeOrder(order);
+              const {paidAmount, pendingAmount, isFullyPaid, paymentDisplay} =
+                describeOrder(order);
 
               return (
                 <div
                   key={order.id}
-                  className={`space-y-2 rounded-md border bg-white p-3 text-sm ${
-                    overdue ? "border-red-200" : "border-slate-200"
-                  }`}
+                  className="space-y-2 rounded-md border border-slate-200 bg-white p-3 text-sm"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
@@ -541,20 +499,12 @@ export default function OrderList({
                     </div>
 
                     <div className="flex shrink-0 flex-col items-end gap-1">
-                      <span
-                        className={`${BADGE} ${getOrderStatusStyle(order.status)}`}
-                      >
-                        {toSentence(order.status || "PENDING")}
-                      </span>
-                      <span
-                        className={`${BADGE} ${getPaymentStatusStyle(
-                          paymentStatus,
-                          paidAmount,
-                          pendingAmount,
-                        )}`}
-                      >
-                        {toSentence(paymentStatus)}
-                      </span>
+                      {/* Status badge removed */}
+                      <PaymentBadge
+                        order={order}
+                        display={paymentDisplay}
+                        onOpenInstallments={onOpenInstallments}
+                      />
                     </div>
                   </div>
 
@@ -565,10 +515,11 @@ export default function OrderList({
                         {order.orderDate || "—"}
                       </strong>
                     </span>
-                    <span
-                      className={overdue ? "font-semibold text-red-600" : ""}
-                    >
-                      Due: <strong>{order.paymentDueDate || "—"}</strong>
+                    <span>
+                      Due:{" "}
+                      <strong>
+                        {getDueDate(order, nextDueByOrder) || "—"}
+                      </strong>
                     </span>
                   </div>
 
@@ -590,9 +541,7 @@ export default function OrderList({
                     <div className="rounded bg-slate-50 p-1">
                       Pending
                       <br />
-                      <strong
-                        className={overdue ? "text-red-600" : "text-amber-700"}
-                      >
+                      <strong className="text-amber-700">
                         {money(pendingAmount)}
                       </strong>
                     </div>
@@ -624,167 +573,21 @@ export default function OrderList({
           </div>
 
           {/* DESKTOP TABLE VIEW */}
-          {/* <div className="hidden w-full overflow-x-auto border-y border-slate-200 bg-white lg:block">
-            <table className="w-full border-collapse text-left text-sm text-black">
-              <thead className="border-b border-slate-200 bg-slate-50">
-                <tr>
-                  <th className="px-3 py-3">Order no.</th>
-                  <th className="px-3 py-3">Customer</th>
-                  <th className="px-3 py-3">Order date</th>
-                  <th className="px-3 py-3 text-right">Total</th>
-                  <th className="px-3 py-3 text-right">GST</th>
-                  <th className="px-3 py-3 text-right">Paid</th>
-                  <th className="px-3 py-3 text-right">Pending</th>
-                  <th className="px-3 py-3">Due date</th>
-                  <th className="px-3 py-3">Method</th>
-                  <th className="px-3 py-3">Payment</th>
-                  <th className="px-3 py-3">Status</th>
-                  <th className="px-3 py-3 text-center">Actions</th>
-                </tr>
-              </thead>
-
-              <tbody className="divide-y divide-slate-100">
-                {pagination.paginatedData.map((order) => {
-                  const {
-                    paidAmount,
-                    pendingAmount,
-                    isFullyPaid,
-                    paymentStatus,
-                    overdue,
-                  } = describeOrder(order);
-
-                  return (
-                    <tr
-                      key={order.id}
-                      className={`transition-colors hover:bg-slate-50 ${
-                        overdue ? "bg-red-50/40" : ""
-                      }`}
-                    >
-                      <td className="whitespace-nowrap px-3 py-2 font-bold text-slate-500">
-                        #{order.id}
-                      </td>
-
-                      <td className="max-w-48 px-3 py-2 text-sm">
-                        <CustomerNameButton
-                          order={order}
-                          onOpenEdit={onOpenEdit}
-                          className="block max-w-full truncate"
-                        />
-                      </td>
-
-                      <td className="whitespace-nowrap px-3 py-2 text-slate-600">
-                        {order.orderDate || "—"}
-                      </td>
-
-                      //
-
-                      <td className="whitespace-nowrap px-3 py-2 text-right font-bold text-slate-900">
-                        {money(order.totalAmount)}
-                      </td>
-
-                      <td className="whitespace-nowrap px-3 py-2 text-right font-bold text-violet-700">
-                        {money(order.totalGstAmount)}
-                      </td>
-
-                      <td className="whitespace-nowrap px-3 py-2 text-right font-bold text-emerald-700">
-                        {money(paidAmount)}
-                      </td>
-
-                      <td
-                        className={`whitespace-nowrap px-3 py-2 text-right font-bold ${
-                          overdue ? "text-red-600" : "text-amber-700"
-                        }`}
-                      >
-                        {money(pendingAmount)}
-                      </td>
-
-                      <td
-                        className={`whitespace-nowrap px-3 py-2 font-medium ${
-                          overdue ? "text-red-600" : "text-slate-600"
-                        }`}
-                      >
-                        <div className="flex items-center gap-1.5">
-                          <CalendarClock className="h-4 w-4 shrink-0" />
-                          <span>{order.paymentDueDate || "—"}</span>
-                        </div>
-                      </td>
-
-                      <td className="whitespace-nowrap px-3 py-2 text-slate-600">
-                        {formatPaymentMethod(order.paymentMethod)}
-                      </td>
-
-                      <td className="whitespace-nowrap px-3 py-2">
-                        <span
-                          className={`${BADGE} ${getPaymentStatusStyle(
-                            paymentStatus,
-                            paidAmount,
-                            pendingAmount,
-                          )}`}
-                        >
-                          {toSentence(paymentStatus)}
-                        </span>
-                      </td>
-
-                      <td className="whitespace-nowrap px-3 py-2">
-                        <span
-                          className={`${BADGE} ${getOrderStatusStyle(order.status)}`}
-                        >
-                          {toSentence(order.status || "PENDING")}
-                        </span>
-                      </td>
-
-                      <td className="px-3 py-2">
-                        <OrderActions
-                          order={order}
-                          isFullyPaid={isFullyPaid}
-                          {...actionHandlers}
-                        />
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-
-              <tfoot className="border-t-2 border-slate-300 bg-slate-100 text-sm font-bold text-slate-900">
-                <tr>
-                  <td
-                    className="px-3 py-2.5"
-                    colSpan={4}
-                  >
-                    Total ({filteredOrders.length} orders)
-                  </td>
-                  <td className="px-3 py-2.5 text-right">
-                    {money(listTotals.total)}
-                  </td>
-                  <td className="px-3 py-2.5 text-right text-violet-700">
-                    {money(listTotals.gst)}
-                  </td>
-                  <td className="px-3 py-2.5 text-right text-emerald-700">
-                    {money(listTotals.paid)}
-                  </td>
-                  <td className="px-3 py-2.5 text-right text-amber-700">
-                    {money(listTotals.pending)}
-                  </td>
-                  <td colSpan={4} />
-                </tr>
-              </tfoot>
-            </table>
-          </div> */}
           <div className="hidden w-full border-y border-slate-200 bg-white lg:block">
             <table className="w-full border-collapse text-left text-xs text-slate-700">
-              <thead className="border-b border-slate-200 bg-slate-50">
+              <thead className="border-b border-slate-200 bg-blue-400 text-white">
                 <tr>
-                  <th className="px-1.5 py-2">Order no.</th>
+                  <th className="px-1.5 py-2">O.No</th>
                   <th className="px-1.5 py-2">Customer</th>
                   <th className="px-1.5 py-2">Order date</th>
-                  <th className="px-1.5 py-2">Due date</th>
                   <th className="px-1.5 py-2 text-right">Total</th>
                   <th className="px-1.5 py-2 text-right">GST</th>
                   <th className="px-1.5 py-2 text-right">Paid</th>
                   <th className="px-1.5 py-2 text-right">Pending</th>
+                  <th className="px-1.5 py-2">Due date</th>
                   <th className="px-1.5 py-2">Method</th>
                   <th className="px-1.5 py-2">Payment</th>
-                  <th className="px-1.5 py-2">Status</th>
+                  {/* Status column removed */}
                   <th className="px-1.5 py-2 text-center">Actions</th>
                 </tr>
               </thead>
@@ -795,16 +598,13 @@ export default function OrderList({
                     paidAmount,
                     pendingAmount,
                     isFullyPaid,
-                    paymentStatus,
-                    overdue,
+                    paymentDisplay,
                   } = describeOrder(order);
 
                   return (
                     <tr
                       key={order.id}
-                      className={`transition-colors hover:bg-slate-50 ${
-                        overdue ? "bg-red-50/40" : ""
-                      }`}
+                      className="transition-colors hover:bg-slate-50"
                     >
                       <td className="whitespace-nowrap px-1.5 py-1.5 font-bold text-slate-500">
                         #{order.id}
@@ -822,60 +622,41 @@ export default function OrderList({
                         {order.orderDate || "—"}
                       </td>
 
-                      <td
-                        className={`whitespace-nowrap px-1.5 py-1.5 font-medium ${
-                          overdue ? "text-red-600" : "text-slate-600"
-                        }`}
-                      >
-                        <div className="flex items-center gap-1">
-                          <CalendarClock className="h-3.5 w-3.5 shrink-0" />
-                          <span>{order.paymentDueDate || "—"}</span>
-                        </div>
-                      </td>
-
-                      <td className="whitespace-nowrap px-1.5 py-1.5 text-right font-bold text-slate-900">
+                      <td className="whitespace-nowrap px-1.5 py-1.5 text-right font-semibold text-slate-900">
                         {money(order.totalAmount)}
                       </td>
 
-                      <td className="whitespace-nowrap px-1.5 py-1.5 text-right font-bold text-violet-700">
+                      <td className="whitespace-nowrap px-1.5 py-1.5 text-right font-semibold text-violet-700">
                         {money(order.totalGstAmount)}
                       </td>
 
-                      <td className="whitespace-nowrap px-1.5 py-1.5 text-right font-bold text-emerald-700">
+                      <td className="whitespace-nowrap px-1.5 py-1.5 text-right font-semibold text-emerald-700">
                         {money(paidAmount)}
                       </td>
 
-                      <td
-                        className={`whitespace-nowrap px-1.5 py-1.5 text-right font-bold ${
-                          overdue ? "text-red-600" : "text-amber-700"
-                        }`}
-                      >
+                      <td className="whitespace-nowrap px-1.5 py-1.5 text-right font-semibold text-amber-700">
                         {money(pendingAmount)}
                       </td>
 
-                      <td className="whitespace-nowrap px-1.5 py-1.5 text-slate-600">
+                      {/* Calendar icon removed */}
+                      <td className="whitespace-nowrap px-1.5 py-1.5 font-medium text-slate-800">
+                        {getDueDate(order, nextDueByOrder) || "—"}
+                      </td>
+
+                      <td className="whitespace-nowrap px-1.5 py-1.5 text-gray-900">
                         {formatPaymentMethod(order.paymentMethod)}
                       </td>
 
                       <td className="whitespace-nowrap px-1.5 py-1.5">
-                        <span
-                          className={`${BADGE} px-1.5 py-0.5 text-[11px] ${getPaymentStatusStyle(
-                            paymentStatus,
-                            paidAmount,
-                            pendingAmount,
-                          )}`}
-                        >
-                          {toSentence(paymentStatus)}
-                        </span>
+                        <PaymentBadge
+                          order={order}
+                          display={paymentDisplay}
+                          onOpenInstallments={onOpenInstallments}
+                          className="px-1.5 py-0.5 text-[11px]"
+                        />
                       </td>
 
-                      <td className="whitespace-nowrap px-1.5 py-1.5">
-                        <span
-                          className={`${BADGE} px-1.5 py-0.5 text-[11px] ${getOrderStatusStyle(order.status)}`}
-                        >
-                          {toSentence(order.status || "PENDING")}
-                        </span>
-                      </td>
+                      {/* Status cell removed */}
 
                       <td className="px-1.5 py-1.5">
                         <OrderActions
@@ -893,7 +674,7 @@ export default function OrderList({
                 <tr>
                   <td
                     className="px-1.5 py-2"
-                    colSpan={4}
+                    colSpan={3}
                   >
                     Total ({filteredOrders.length} orders)
                   </td>

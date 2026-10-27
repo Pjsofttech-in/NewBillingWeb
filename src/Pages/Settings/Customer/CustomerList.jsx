@@ -81,7 +81,7 @@ const CustomerList = ({
       {/* Table Section */}
       <div className="overflow-x-auto bg-white rounded-xl shadow-sm border border-slate-200">
         <table className="w-full text-left text-sm text-slate-600">
-          <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 font-semibold text-xs">
+          <thead className="border-b border-slate-200 font-semibold text-xs bg-blue-400 text-white">
             <tr>
               <th className="px-4 py-3.5">ID</th>
               <th className="px-4 py-3.5">Customer name</th>

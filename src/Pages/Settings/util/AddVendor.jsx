@@ -181,7 +181,7 @@ const AddVendor = () => {
       {/* Vendor Table */}
       <div className="overflow-x-auto rounded-xl border border-slate-200 shadow-xs">
         <table className="w-full text-left text-sm text-slate-700">
-          <thead className="bg-slate-50 text-xs text-slate-500 border-b border-slate-200">
+          <thead className="text-xs border-b border-slate-200 bg-blue-400 text-white">
             <tr>
               <th className="px-4 py-3 font-semibold">S.No.</th>
               <th className="px-4 py-3 font-semibold">Vendor name</th>

@@ -1,4 +1,4 @@
-import {useState} from "react";
+import {useMemo, useState} from "react";
 import {useQuery} from "@tanstack/react-query";
 import {
   AlertTriangle,
@@ -6,8 +6,10 @@ import {
   CalendarClock,
   CalendarDays,
   CalendarRange,
+  CheckCircle2,
+  Hourglass,
   IndianRupee,
-  ShoppingCart,
+  Receipt,
   Wallet,
 } from "lucide-react";
 
@@ -19,6 +21,8 @@ import {
   fetchTopSellingCategories,
   fetchTopSellingProducts,
 } from "../../api/dashboardApi";
+import {fetchVendorBills} from "../../api/vendorServiceApi";
+import {money} from "./dashboardUtils";
 
 import RevenueOrderCard from "./RevenueOrderCard";
 import StatCard from "./StatCard";
@@ -69,6 +73,25 @@ export default function Dashboard() {
     queryKey: ["dashboard", "payment-revenue"],
     queryFn: fetchPaymentStatusRevenue,
   });
+
+  // Vendor payments: total / paid / remaining of all vendor bills.
+  // Same query key as the Vendor Bills page, so paying a bill updates these cards too.
+  const {data: vendorBills = [], isLoading: vendorBillsLoading} = useQuery({
+    queryKey: ["vendorBills", "list"],
+    queryFn: fetchVendorBills,
+  });
+
+  const vendorTotals = useMemo(() => {
+    const totals = {total: 0, paid: 0, remaining: 0};
+    for (const bill of Array.isArray(vendorBills) ? vendorBills : []) {
+      const total = Number(bill.totalAmount || 0);
+      const paid = Number(bill.paidAmount || 0);
+      totals.total += total;
+      totals.paid += paid;
+      totals.remaining += Number(bill.dueAmount ?? Math.max(0, total - paid));
+    }
+    return totals;
+  }, [vendorBills]);
 
   // Pending (unpaid) amount per period = sum of pendingAmount of the analytics
   // points of that period (the same numbers the analytics chart uses).
@@ -156,7 +179,8 @@ export default function Dashboard() {
           icon={Wallet}
           label="Total Revenue"
           pending={
-            summary?.pendingOrders?.totalPendingAmount ?? summary?.pendingRevenue
+            summary?.pendingOrders?.totalPendingAmount ??
+            summary?.pendingRevenue
           }
           revenue={summary?.totalRevenue}
           orders={summary?.totalOrdersCount}
@@ -164,14 +188,28 @@ export default function Dashboard() {
         />
       </div>
 
-      {/* Stock / order cards */}
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+      {/* Vendor payments + stock cards */}
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-5">
         <StatCard
           tone="blue"
-          icon={ShoppingCart}
-          label="Orders Today"
-          value={summary?.totalOrdersToday ?? 0}
-          loading={summaryLoading}
+          icon={Receipt}
+          label="Vendor Amount"
+          value={money(vendorTotals.total)}
+          loading={vendorBillsLoading}
+        />
+        <StatCard
+          tone="emerald"
+          icon={CheckCircle2}
+          label="Paid Amount"
+          value={money(vendorTotals.paid)}
+          loading={vendorBillsLoading}
+        />
+        <StatCard
+          tone="lowStock"
+          icon={Hourglass}
+          label="Remaining Amount"
+          value={money(vendorTotals.remaining)}
+          loading={vendorBillsLoading}
         />
         <StatCard
           tone="slate"
@@ -222,4 +260,4 @@ export default function Dashboard() {
       />
     </div>
   );
-} 
+}

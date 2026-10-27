@@ -1,5 +1,16 @@
 import {useMemo, useState} from "react";
-import {Download, ExternalLink, FileText, Plus, Search, Trash2, Truck, X} from "lucide-react";
+import {
+  Ban,
+  Download,
+  ExternalLink,
+  FileText,
+  IndianRupee,
+  Plus,
+  Search,
+  Trash2,
+  Truck,
+  X,
+} from "lucide-react";
 
 import Select from "../../Components/Form/Select";
 import SearchBar from "../../Components/SearchBar";
@@ -15,13 +26,14 @@ import Pagination from "../../Components/Pagination";
 import {usePagination} from "../../hooks/usePagination";
 import {inr} from "../../utils/vendorPricing";
 
+// Badge colour + the dot in front of the text.
 const STATUS_STYLES = {
-  PREPARING: "bg-slate-100 text-slate-700",
-  SHIPPED: "bg-blue-100 text-blue-800",
-  IN_TRANSIT: "bg-blue-100 text-blue-800",
-  OUT_FOR_DELIVERY: "bg-amber-100 text-amber-800",
-  DELIVERED: "bg-green-100 text-green-800",
-  CANCELLED: "bg-red-100 text-red-800",
+  PREPARING: {badge: "bg-slate-100 text-slate-700", dot: "bg-slate-500"},
+  SHIPPED: {badge: "bg-blue-100 text-blue-800", dot: "bg-blue-500"},
+  IN_TRANSIT: {badge: "bg-indigo-100 text-indigo-800", dot: "bg-indigo-500"},
+  OUT_FOR_DELIVERY: {badge: "bg-amber-100 text-amber-800", dot: "bg-amber-500"},
+  DELIVERED: {badge: "bg-green-100 text-green-800", dot: "bg-green-500"},
+  CANCELLED: {badge: "bg-red-100 text-red-800", dot: "bg-red-500"},
 };
 
 const INITIAL_FILTERS = {
@@ -33,43 +45,69 @@ const INITIAL_FILTERS = {
 };
 
 const dateInputClass =
-  "w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100";
+  "w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100 sm:text-base";
 
 const TONES = {
-  blue: {box: "bg-blue-50 border-blue-200", value: "text-blue-700"},
-  emerald: {box: "bg-emerald-50 border-emerald-200", value: "text-emerald-700"},
-  rose: {box: "bg-rose-50 border-rose-200", value: "text-rose-700"},
+  blue: {
+    box: "bg-blue-50 border-blue-200",
+    icon: "bg-blue-100 text-blue-700",
+    value: "text-blue-800",
+  },
+  emerald: {
+    box: "bg-emerald-50 border-emerald-200",
+    icon: "bg-emerald-100 text-emerald-700",
+    value: "text-emerald-800",
+  },
+  rose: {
+    box: "bg-rose-50 border-rose-200",
+    icon: "bg-rose-100 text-rose-700",
+    value: "text-rose-800",
+  },
 };
 
-const StatCard = ({label, value, tone = "blue", loading = false}) => {
+const StatCard = ({
+  label,
+  value,
+  icon: Icon,
+  tone = "blue",
+  loading = false,
+}) => {
   const t = TONES[tone] || TONES.blue;
 
   return (
     <div
-      className={`flex flex-col items-start gap-0.5 rounded-2xl border px-3 py-2 shadow-sm transition hover:shadow-md sm:flex-row sm:items-center sm:justify-between sm:gap-2 ${t.box}`}
+      className={`flex items-center gap-2 rounded-lg border px-2.5 py-1.5 shadow-xs ${t.box}`}
       title={`${label}: ${loading ? "..." : value}`}
     >
-      <span className="min-w-0 max-w-full truncate font-medium text-slate-700 sm:flex-1 sm:text-sm">
-        {label}
-      </span>
-      <span
-        className={`shrink-0 text-sm font-semibold leading-tight sm:text-base ${t.value}`}
-      >
-        {loading ? "..." : value}
-      </span>
+      {Icon && (
+        <div className={`shrink-0 rounded-md p-1.5 ${t.icon}`}>
+          <Icon className="h-3.5 w-3.5" />
+        </div>
+      )}
+      <div className="min-w-0">
+        <p className="truncate text-[12px] font-medium leading-tight text-slate-700">
+          {label}
+        </p>
+        <p className={`text-sm font-medium leading-tight ${t.value}`}>
+          {loading ? "..." : value}
+        </p>
+      </div>
     </div>
   );
 };
 
-const StatusBadge = ({status}) => (
-  <span
-    className={`inline-flex whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-      STATUS_STYLES[status] || "bg-slate-100 text-slate-700"
-    }`}
-  >
-    {status?.replaceAll("_", " ") || "—"}
-  </span>
-);
+const StatusBadge = ({status}) => {
+  const style = STATUS_STYLES[status] || STATUS_STYLES.PREPARING;
+
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold ${style.badge}`}
+    >
+      <span className={`h-1.5 w-1.5 rounded-full ${style.dot}`} />
+      {status?.replaceAll("_", " ") || "—"}
+    </span>
+  );
+};
 
 const MiniField = ({label, children}) => (
   <div className="min-w-0 rounded-lg bg-slate-50 px-2.5 py-1.5">
@@ -86,6 +124,13 @@ const StateBox = ({icon: Icon, children}) => (
     {children}
   </div>
 );
+
+// Small square icon button used in the table (with a tooltip).
+const iconBtn =
+  "inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border transition active:scale-95";
+
+// The backend sends the order as `orderId` (the nested `order` object is not serialized).
+const getOrderId = (shipment) => shipment.orderId ?? shipment.order?.id ?? null;
 
 const ShipmentList = ({
   shipments = [],
@@ -131,6 +176,15 @@ const ShipmentList = ({
 
   const {fromDate: rangeFrom, toDate: rangeTo} = shipmentDateRange(filters);
 
+  // How many shipments are in each status (for the quick filter chips).
+  const statusCounts = useMemo(() => {
+    const counts = {};
+    for (const shipment of shipments) {
+      counts[shipment.status] = (counts[shipment.status] || 0) + 1;
+    }
+    return counts;
+  }, [shipments]);
+
   const filteredShipments = useMemo(() => {
     const query = filters.search.toLowerCase().trim();
 
@@ -147,7 +201,7 @@ const ShipmentList = ({
         shipment.customerMobile?.toLowerCase().includes(query) ||
         shipment.companyName?.toLowerCase().includes(query) ||
         shipment.employeeName?.toLowerCase().includes(query) ||
-        String(shipment.order?.id || "").includes(query) ||
+        String(getOrderId(shipment) || "").includes(query) ||
         String(shipment.id || "").includes(query);
 
       const matchesStatus =
@@ -200,6 +254,9 @@ const ShipmentList = ({
 
   const pagination = usePagination(filteredShipments, 25, paginationKey);
 
+  // Sr No continues across pages (page 2 with 25 rows starts at 26).
+  const firstSrNo = (pagination.currentPage - 1) * pagination.itemsPerPage;
+
   const handleConfirmDelete = async () => {
     if (!shipmentToDelete) return;
 
@@ -214,7 +271,7 @@ const ShipmentList = ({
   };
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       <DeleteConfirmModal
         isOpen={Boolean(shipmentToDelete)}
         title="Delete Shipment"
@@ -230,30 +287,14 @@ const ShipmentList = ({
       />
 
       {/* Filters Section */}
-      <div className="space-y-2.5  rounded-xl border border-slate-200 bg-white p-2.5 shadow-xs">
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="space-y-2.5 rounded-xl border border-slate-200 bg-white p-3 shadow-xs">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           <SearchBar
             value={filters.search}
             onChange={(text) => updateFilter("search", text)}
             placeholder="Search shipment, order, customer, courier..."
             ariaLabel="Search shipments"
-            size="sm"
             debounceMs={0}
-            // className=" px-1 py-3 "
-          />
-
-          <Select
-            name="shipmentStatus"
-            placeholder="All Statuses"
-            allowEmpty
-            register={() => ({
-              value: filters.status,
-              onChange: (e) => updateFilter("status", e.target.value),
-            })}
-            options={Object.keys(STATUS_STYLES).map((status) => ({
-              value: status,
-              label: status.replaceAll("_", " "),
-            }))}
           />
 
           <Select
@@ -274,7 +315,7 @@ const ShipmentList = ({
         </div>
 
         {isCustom && (
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             <div>
               <label
                 htmlFor="fromDate"
@@ -310,21 +351,85 @@ const ShipmentList = ({
             </div>
 
             {invalidRange && (
-              <p className="text-xs font-medium text-red-600 sm:col-span-2 xl:col-span-3">
+              <p className="text-xs font-medium text-red-600 sm:col-span-2">
                 "From date" cannot be after "To date".
               </p>
             )}
           </div>
         )}
 
-        <div className="flex flex-col gap-2 border-t border-slate-100 pt-2 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1 rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700">
-              Total shipments
-              <span className="rounded-full bg-blue-600 px-1.5 py-0.5 text-[10px] leading-none text-white">
-                {filteredShipments.length}
-              </span>
-            </span>
+        {/* Quick status filter (click a status to show only those shipments) */}
+        <div
+          role="group"
+          aria-label="Filter by status"
+          className="flex flex-wrap items-center gap-1.5"
+        >
+          {[
+            {value: "", label: "All", count: shipments.length},
+            ...Object.keys(STATUS_STYLES).map((status) => ({
+              value: status,
+              label: status
+                .replaceAll("_", " ")
+                .toLowerCase()
+                .replace(/^./, (char) => char.toUpperCase()),
+              count: statusCounts[status] || 0,
+            })),
+          ].map((chip) => {
+            const active = filters.status === chip.value;
+
+            return (
+              <button
+                key={chip.value || "ALL"}
+                type="button"
+                onClick={() => updateFilter("status", chip.value)}
+                aria-pressed={active}
+                className={`inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold capitalize transition ${
+                  active
+                    ? "border-blue-600 bg-blue-600 text-white shadow-xs"
+                    : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+                }`}
+              >
+                {chip.label.toLowerCase()}
+                <span
+                  className={`rounded-full px-1.5 py-0.5 text-[10px] leading-none ${
+                    active
+                      ? "bg-white/25 text-white"
+                      : "bg-slate-100 text-slate-600"
+                  }`}
+                >
+                  {chip.count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="flex flex-col gap-2 border-t border-slate-100 pt-2.5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Summary cards (instead of the "Showing X of Y" text) */}
+            <div className="grid w-full grid-cols-3 gap-2 sm:w-auto sm:min-w-120">
+              <StatCard
+                label="Total Shipments"
+                value={summary?.totalShipments ?? shipments.length}
+                icon={Truck}
+                tone="blue"
+                loading={loadingSummary}
+              />
+              <StatCard
+                label="Shipment Cost"
+                value={inr(summary?.totalShipmentCost)}
+                icon={IndianRupee}
+                tone="emerald"
+                loading={loadingSummary}
+              />
+              <StatCard
+                label="Cancelled Shipments"
+                value={summary?.cancelledShipments ?? 0}
+                icon={Ban}
+                tone="rose"
+                loading={loadingSummary}
+              />
+            </div>
 
             {hasActiveFilters && (
               <button
@@ -333,7 +438,7 @@ const ShipmentList = ({
                 className="inline-flex h-7 cursor-pointer items-center gap-1 rounded-lg bg-slate-100 px-2 text-xs font-semibold text-slate-600 transition hover:bg-red-50 hover:text-red-600"
               >
                 <X className="h-3.5 w-3.5" />
-                Clear
+                Clear filters
               </button>
             )}
           </div>
@@ -355,35 +460,13 @@ const ShipmentList = ({
             <button
               type="button"
               onClick={onOpenCreate}
-              className="flex h-8 w-full cursor-pointer items-center justify-center gap-1 rounded-lg bg-gradient-to-r from-blue-500 to-blue-600 px-3 text-xs font-semibold text-white shadow-xs transition hover:from-blue-600 hover:to-blue-700 active:scale-95 sm:w-auto"
+              className="flex h-8 w-full cursor-pointer items-center justify-center gap-1 rounded-lg bg-linear-to-r from-blue-500 to-blue-600 px-3 text-xs font-semibold text-white shadow-xs transition hover:from-blue-600 hover:to-blue-700 active:scale-95 sm:w-auto"
             >
               <Plus className="h-3.5 w-3.5" />
               Create shipment
             </button>
           </div>
         </div>
-      </div>
-
-      {/* Summary Cards */}
-      <div className="grid grid-cols-3 gap-2">
-        <StatCard
-          label="Total shipments"
-          value={summary?.totalShipments ?? shipments.length}
-          tone="blue"
-          loading={loadingSummary}
-        />
-        <StatCard
-          label="Total shipment cost"
-          value={inr(summary?.totalShipmentCost)}
-          tone="emerald"
-          loading={loadingSummary}
-        />
-        <StatCard
-          label="Cancelled shipments"
-          value={summary?.cancelledShipments ?? 0}
-          tone="rose"
-          loading={loadingSummary}
-        />
       </div>
 
       {/* Main Table Content */}
@@ -423,20 +506,25 @@ const ShipmentList = ({
           {/* Mobile / Tablet Card View */}
           <div className="space-y-2 lg:hidden">
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {pagination.paginatedData.map((shipment) => (
+              {pagination.paginatedData.map((shipment, index) => (
                 <div
                   key={shipment.id}
                   className="space-y-2 rounded-xl border border-slate-200 bg-white p-3 text-sm shadow-xs"
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="truncate font-bold text-slate-900">
-                        {shipment.shipmentName || `Shipment #${shipment.id}`}
-                      </p>
-                      <p className="flex gap-3 text-xs text-slate-500">
-                        <span>ID #{shipment.id}</span>
-                        <span>Order #{shipment.order?.id ?? "—"}</span>
-                      </p>
+                    <div className="flex min-w-0 items-start gap-2">
+                      <span className="mt-0.5 inline-flex h-6 min-w-6 shrink-0 items-center justify-center rounded-full bg-blue-50 px-1.5 text-[11px] font-bold text-blue-700">
+                        {firstSrNo + index + 1}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="truncate font-bold text-slate-900">
+                          {shipment.shipmentName || `Shipment #${shipment.id}`}
+                        </p>
+                        <p className="flex gap-3 text-xs text-slate-500">
+                          <span>ID #{shipment.id}</span>
+                          <span>Order #{getOrderId(shipment) ?? "—"}</span>
+                        </p>
+                      </div>
                     </div>
                     <StatusBadge status={shipment.status} />
                   </div>
@@ -476,7 +564,7 @@ const ShipmentList = ({
                       </p>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center justify-end gap-1.5">
                       {shipment.trackingLink && (
                         <a
                           href={shipment.trackingLink}
@@ -524,31 +612,37 @@ const ShipmentList = ({
             </div>
           </div>
 
-          {/* Compact Desktop Table View (Fits without horizontal scrollbar) */}
+          {/* Desktop Table View */}
           <div className="hidden w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs lg:block">
-            <table className="w-full table-fixed text-left text-[11px] text-slate-700 border-collapse">
-              <thead className="border-b border-slate-200 bg-slate-50 text-[10px] font-bold uppercase text-slate-600">
+            <table className="w-full table-fixed border-collapse text-left text-xs text-slate-700">
+              <thead className="border-b border-slate-200 bg-blue-400 text-[11px] font-bold uppercase tracking-wide text-white">
                 <tr>
-                  <th className="w-[18%] px-1.5 py-2">Shipment</th>
-                  <th className="w-[7%] px-1.5 py-2">Order</th>
-                  <th className="w-[16%] px-1.5 py-2">Customer</th>
-                  <th className="w-[17%] px-1.5 py-2">Courier / Tracking</th>
-                  <th className="w-[11%] px-1.5 py-2">Employee</th>
-                  <th className="w-[9%] px-1.5 py-2 text-right">Cost</th>
-                  <th className="w-[8%] px-1.5 py-2">Date</th>
-                  <th className="w-[8%] px-1.5 py-2 text-center">Status</th>
-                  <th className="w-[6%] px-1.5 py-2 text-right">Action</th>
+                  <th className="w-[5%] px-2 py-2.5 text-center">Sr No</th>
+                  <th className="w-[16%] px-2 py-2.5">Shipment</th>
+                  <th className="w-[6%] px-2 py-2.5">Order</th>
+                  <th className="w-[12%] px-2 py-2.5">Customer</th>
+                  <th className="w-[16%] px-2 py-2.5">Courier / Tracking</th>
+                  <th className="w-[10%] px-2 py-2.5">Employee</th>
+                  <th className="w-[6%] px-2 py-2.5 text-right">Cost</th>
+                  <th className="w-[9%] px-2 py-2.5">Date</th>
+                  <th className="w-[10%] px-2 py-2.5 text-center">Status</th>
+                  <th className="w-[8%] px-2 py-2.5 text-center">Action</th>
                 </tr>
               </thead>
 
               <tbody className="divide-y divide-slate-100">
-                {pagination.paginatedData.map((shipment) => (
+                {pagination.paginatedData.map((shipment, index) => (
                   <tr
                     key={shipment.id}
-                    className="transition-colors hover:bg-slate-50"
+                    className="transition-colors odd:bg-white even:bg-slate-50/60 hover:bg-blue-50/60"
                   >
+                    {/* Sr No */}
+                    <td className="px-2 py-2 text-center font-semibold text-slate-500">
+                      {firstSrNo + index + 1}
+                    </td>
+
                     {/* Shipment Name & ID */}
-                    <td className="px-1.5 py-1.5 truncate">
+                    <td className="px-2 py-2">
                       <p
                         className="truncate font-semibold text-slate-800"
                         title={
@@ -557,40 +651,43 @@ const ShipmentList = ({
                       >
                         {shipment.shipmentName || `Shipment #${shipment.id}`}
                       </p>
-                      <p className="text-[10px] text-slate-400">
-                        #{shipment.id}
-                      </p>
+                      {/* <p className="text-[11px] text-slate-400">
+                        ID #{shipment.id}
+                      </p> */}
                     </td>
 
                     {/* Order ID */}
-                    <td className="px-1.5 py-1.5 truncate font-medium text-slate-700">
-                      #{shipment.order?.id ?? "—"}
+                    <td className="px-2 py-2 font-medium text-slate-700">
+                      #{getOrderId(shipment) ?? "—"}
                     </td>
 
                     {/* Customer */}
-                    <td className="px-1.5 py-1.5 truncate">
+                    <td className="px-2 py-2">
                       <p
                         className="truncate font-semibold text-slate-800"
                         title={shipment.customerName || "—"}
                       >
                         {shipment.customerName || "—"}
                       </p>
-                      <p className="truncate text-[10px] text-slate-500">
+                      <p className="truncate text-[11px] text-slate-500">
                         {shipment.customerMobile || ""}
                       </p>
                     </td>
 
                     {/* Courier / Tracking */}
-                    <td className="px-1.5 py-1.5 truncate">
+                    <td className="px-2 py-2">
                       <p
                         className="truncate font-semibold text-slate-700"
                         title={shipment.companyName || "—"}
                       >
                         {shipment.companyName || "—"}
                       </p>
-                      <div className="flex items-center gap-1.5 truncate text-[10px] text-slate-500">
+                      <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
                         {shipment.trackingId && (
-                          <span className="truncate">
+                          <span
+                            className="truncate"
+                            title={shipment.trackingId}
+                          >
                             {shipment.trackingId}
                           </span>
                         )}
@@ -599,19 +696,19 @@ const ShipmentList = ({
                             href={shipment.trackingLink}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex shrink-0 items-center gap-0.5 text-blue-600 hover:underline"
+                            className="inline-flex shrink-0 items-center gap-0.5 font-semibold text-blue-600 hover:underline"
                           >
                             Track
-                            <ExternalLink className="h-2.5 w-2.5" />
+                            <ExternalLink className="h-3 w-3" />
                           </a>
                         )}
                       </div>
                     </td>
 
                     {/* Employee */}
-                    <td className="px-1.5 py-1.5 truncate font-medium text-slate-700">
+                    <td className="px-2 py-2 font-medium text-slate-700">
                       <span
-                        className="truncate block"
+                        className="block truncate"
                         title={shipment.employeeName || "—"}
                       >
                         {shipment.employeeName || "—"}
@@ -619,60 +716,65 @@ const ShipmentList = ({
                     </td>
 
                     {/* Cost */}
-                    <td className="px-1.5 py-1.5 text-right font-bold text-slate-800 truncate">
+                    <td className="truncate px-2 py-2 text-right font-bold text-slate-800">
                       {inr(shipment.shipmentCost)}
                     </td>
 
                     {/* Date */}
-                    <td className="px-1.5 py-1.5 text-slate-600 text-[10px] truncate">
+                    <td className="truncate px-2 py-2 text-slate-600">
                       {shipment.shipmentDate || "—"}
                     </td>
 
                     {/* Status */}
-                    <td className="px-1.5 py-1.5 text-center truncate">
+                    <td className="px-2 py-2 text-center">
                       <StatusBadge status={shipment.status} />
                     </td>
 
                     {/* Actions */}
-                    <td className="px-1.5 py-1.5 text-right">
-                      <button
-                        type="button"
-                        onClick={() => handleReceipt(shipment.id)}
-                        className="mr-1 inline-flex cursor-pointer items-center justify-center rounded-md border border-slate-200 bg-white p-1 text-slate-700 transition hover:bg-slate-100 active:scale-95"
-                        title="Open receipt"
-                      >
-                        <FileText className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleReceiptDownload(shipment.id)}
-                        className="mr-1 inline-flex cursor-pointer items-center justify-center rounded-md border border-slate-200 bg-white p-1 text-slate-700 transition hover:bg-slate-100 active:scale-95"
-                        title="Download receipt"
-                      >
-                        <Download className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setShipmentToDelete(shipment)}
-                        className="inline-flex cursor-pointer items-center justify-center rounded-md border border-red-200 bg-white p-1 text-red-600 transition hover:bg-red-600 hover:text-white active:scale-95"
-                        title="Delete shipment"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
+                    <td className="px-2 py-2">
+                      <div className="flex items-center justify-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => handleReceipt(shipment.id)}
+                          className={`${iconBtn} border-slate-200 bg-white text-slate-700 hover:bg-slate-100`}
+                          title="Open receipt"
+                          aria-label="Open receipt"
+                        >
+                          <FileText className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleReceiptDownload(shipment.id)}
+                          className={`${iconBtn} border-slate-200 bg-white text-slate-700 hover:bg-slate-100`}
+                          title="Download receipt"
+                          aria-label="Download receipt"
+                        >
+                          <Download className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setShipmentToDelete(shipment)}
+                          className={`${iconBtn} border-red-200 bg-white text-red-600 hover:bg-red-600 hover:text-white`}
+                          title="Delete shipment"
+                          aria-label="Delete shipment"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
               </tbody>
 
-              <tfoot className="border-t border-slate-300 bg-slate-100 text-[11px] font-bold text-slate-900">
+              <tfoot className="border-t border-slate-300 bg-slate-100 text-xs font-bold text-slate-900">
                 <tr>
                   <td
-                    className="px-1.5 py-1.5 truncate"
-                    colSpan={5}
+                    className="px-2 py-2"
+                    colSpan={6}
                   >
                     Total ({filteredShipments.length} shipments)
                   </td>
-                  <td className="px-1.5 py-1.5 text-right text-emerald-700 truncate">
+                  <td className="truncate px-2 py-2 text-right text-emerald-700">
                     {inr(listedCostTotal)}
                   </td>
                   <td colSpan={3} />

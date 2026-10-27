@@ -42,7 +42,7 @@ const buildAddress = (customer) =>
     .join(", ");
 
 const orderLabel = (o) =>
-  `#${o.id} — ${o.customer?.customerName || "N/A"} (₹${Number(
+  `#${o.id} — ${o.customer?.customerName || "N/A"} (${Number(
     o.totalAmount || 0,
   ).toFixed(2)})`;
 
@@ -302,7 +302,7 @@ const ShipmentModal = ({
               />
 
               <Input
-                label="Shipment cost (₹)"
+                label="Shipment cost ()"
                 name="shipmentCost"
                 type="number"
                 placeholder="Cost to send the parcel"

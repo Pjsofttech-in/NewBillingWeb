@@ -15,9 +15,8 @@ import {
 } from "lucide-react";
 import {getProductBatches, fetchStockHistory} from "../../api/productApi";
 import {fetchAttributesByProductType} from "../../api/attributeApi";
+import {moneyAuto as money} from "../../utils/format";
 
-const money = (v) =>
-  `₹${Number(v || 0).toLocaleString("en-IN", {maximumFractionDigits: 2})}`;
 
 const TABS = [
   {id: "overview", label: "Overview", icon: Boxes},
@@ -137,7 +136,11 @@ const ProductDetailsModal = ({
           };
 
   const marginTone =
-    margin > 0 ? "text-emerald-700" : margin < 0 ? "text-red-600" : "text-slate-700";
+    margin > 0
+      ? "text-emerald-700"
+      : margin < 0
+        ? "text-red-600"
+        : "text-slate-700";
 
   return (
     <div
@@ -154,9 +157,9 @@ const ProductDetailsModal = ({
         className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-5xl max-h-[94vh] sm:max-h-[92vh] overflow-hidden flex flex-col"
       >
         {/* ============ HEADER ============ */}
-        <div className="shrink-0 px-4 sm:px-5 pt-4 pb-3 bg-gradient-to-r from-slate-50 to-blue-50 border-b flex items-start justify-between gap-3">
+        <div className="shrink-0 px-4 sm:px-5 pt-4 pb-3 bg-linear-to-r from-slate-50 to-blue-50 border-b flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <h2 className="text-lg sm:text-xl font-bold text-slate-900 break-words leading-snug">
+            <h2 className="text-lg sm:text-xl font-bold text-slate-900 wrap-break-words leading-snug">
               {product.productName}
             </h2>
             <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs">
@@ -180,7 +183,9 @@ const ProductDetailsModal = ({
                   Inactive
                 </span>
               )}
-              <span className="text-slate-400 font-medium">ID #{product.id}</span>
+              <span className="text-slate-400 font-medium">
+                ID #{product.id}
+              </span>
             </div>
           </div>
           <button
@@ -199,7 +204,7 @@ const ProductDetailsModal = ({
             <button
               type="button"
               onClick={onHistory}
-              className="h-9 px-3.5 inline-flex items-center justify-center gap-1.5 rounded-lg text-sm font-semibold text-white bg-gradient-to-r from-blue-500 to-blue-600 shadow-sm hover:from-blue-600 hover:to-blue-700 hover:shadow-md active:scale-95 transition cursor-pointer"
+              className="h-9 px-3.5 inline-flex items-center justify-center gap-1.5 rounded-lg text-sm font-semibold text-white bg-linear-to-r from-blue-500 to-blue-600 shadow-sm hover:from-blue-600 hover:to-blue-700 hover:shadow-md active:scale-95 transition cursor-pointer"
             >
               <History size={16} />
               <span className="truncate">History</span>
@@ -209,7 +214,7 @@ const ProductDetailsModal = ({
             <button
               type="button"
               onClick={onAddStock}
-              className="h-9 px-3.5 inline-flex items-center justify-center gap-1.5 rounded-lg text-sm font-semibold text-white bg-gradient-to-r from-emerald-500 to-emerald-600 shadow-sm hover:from-emerald-600 hover:to-emerald-700 hover:shadow-md active:scale-95 transition cursor-pointer"
+              className="h-9 px-3.5 inline-flex items-center justify-center gap-1.5 rounded-lg text-sm font-semibold text-white bg-linear-to-r from-emerald-500 to-emerald-600 shadow-sm hover:from-emerald-600 hover:to-emerald-700 hover:shadow-md active:scale-95 transition cursor-pointer"
             >
               <PackagePlus size={16} />
               <span className="truncate">Add stock</span>
@@ -274,7 +279,10 @@ const ProductDetailsModal = ({
               <div className="grid grid-cols-2 lg:grid-cols-5 gap-2.5">
                 <div className="col-span-2 lg:col-span-1 rounded-xl border border-slate-200 bg-white p-3">
                   <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-500">
-                    <Boxes size={14} className="text-blue-600" />
+                    <Boxes
+                      size={14}
+                      className="text-blue-600"
+                    />
                     Available stock
                   </div>
                   <p className="mt-1 text-xl font-extrabold text-slate-900 leading-tight">
@@ -327,26 +335,65 @@ const ProductDetailsModal = ({
 
               <Card title="Product details">
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5">
-                  <Field label="Product type" value={product.productType?.typeName || "N/A"} />
+                  <Field
+                    label="Product type"
+                    value={product.productType?.typeName || "N/A"}
+                  />
                   {product.subCategory?.subCategoryName && (
-                    <Field label="Sub category" value={product.subCategory.subCategoryName} />
+                    <Field
+                      label="Sub category"
+                      value={product.subCategory.subCategoryName}
+                    />
                   )}
-                  <Field label="Brand" value={product.brand?.brandName || "N/A"} />
-                  <Field label="Vendor" value={product.vendor?.vendorName || "N/A"} />
-                  <Field label="Unit type" value={unit || "N/A"} />
-                  <Field label="Added on" value={product.productAddedDate || "N/A"} />
-                  <Field label="Status" value={product.active === false ? "Inactive" : "Active"} />
+                  <Field
+                    label="Brand"
+                    value={product.brand?.brandName || "N/A"}
+                  />
+                  <Field
+                    label="Vendor"
+                    value={product.vendor?.vendorName || "N/A"}
+                  />
+                  <Field
+                    label="Unit type"
+                    value={unit || "N/A"}
+                  />
+                  <Field
+                    label="Added on"
+                    value={product.productAddedDate || "N/A"}
+                  />
+                  <Field
+                    label="Status"
+                    value={product.active === false ? "Inactive" : "Active"}
+                  />
                 </div>
               </Card>
 
               <Card title="Stock & value">
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
-                  <Field label="Total stock" value={totalStock} />
-                  <Field label="Available" value={remaining} />
-                  <Field label="Sold" value={sold} />
-                  <Field label="Total sold amount" value={money(product.totalSoldAmount)} />
-                  <Field label="Buy price total" value={money(buyTotal)} />
-                  <Field label="Remaining stock value" value={money(stockAmount)} />
+                  <Field
+                    label="Total stock"
+                    value={totalStock}
+                  />
+                  <Field
+                    label="Available"
+                    value={remaining}
+                  />
+                  <Field
+                    label="Sold"
+                    value={sold}
+                  />
+                  <Field
+                    label="Total sold amount"
+                    value={money(product.totalSoldAmount)}
+                  />
+                  <Field
+                    label="Buy price total"
+                    value={money(buyTotal)}
+                  />
+                  <Field
+                    label="Remaining stock value"
+                    value={money(stockAmount)}
+                  />
                 </div>
               </Card>
 
@@ -378,7 +425,10 @@ const ProductDetailsModal = ({
             <>
               <Card title="How the price is built (per unit)">
                 <div className="divide-y divide-slate-100 text-sm">
-                  <Row label="Product MRP" value={money(product.productMrp)} />
+                  <Row
+                    label="Product MRP"
+                    value={money(product.productMrp)}
+                  />
                   <Row
                     label={`Vendor discount (${product.vendorDiscountPercentage ?? 0}%)`}
                     value={`− ${money(product.vendorDiscountAmount)}`}
@@ -422,10 +472,26 @@ const ProductDetailsModal = ({
                   </p>
                 ) : (
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                    <GstChip label="CGST" applied={product.applyCgst} pct={product.cgstPercentage} />
-                    <GstChip label="SGST" applied={product.applySgst} pct={product.sgstPercentage} />
-                    <GstChip label="UGST" applied={product.applyUgst} pct={product.ugstPercentage} />
-                    <GstChip label="IGST" applied={product.applyIgst} pct={product.igstPercentage} />
+                    <GstChip
+                      label="CGST"
+                      applied={product.applyCgst}
+                      pct={product.cgstPercentage}
+                    />
+                    <GstChip
+                      label="SGST"
+                      applied={product.applySgst}
+                      pct={product.sgstPercentage}
+                    />
+                    <GstChip
+                      label="UGST"
+                      applied={product.applyUgst}
+                      pct={product.ugstPercentage}
+                    />
+                    <GstChip
+                      label="IGST"
+                      applied={product.applyIgst}
+                      pct={product.igstPercentage}
+                    />
                   </div>
                 )}
               </Card>
@@ -438,7 +504,8 @@ const ProductDetailsModal = ({
               title="Purchase history"
               right={
                 <span className="text-xs font-semibold text-slate-500">
-                  {history.length} {history.length === 1 ? "entry" : "entries"} · newest first
+                  {history.length} {history.length === 1 ? "entry" : "entries"}{" "}
+                  · newest first
                 </span>
               }
             >
@@ -466,31 +533,57 @@ const ProductDetailsModal = ({
                 </div>
               ) : sortedHistory.length === 0 ? (
                 <div className="py-8 text-center text-sm text-slate-500">
-                  No purchases recorded yet. Use <b>Add stock</b> to add the first one.
+                  No purchases recorded yet. Use <b>Add stock</b> to add the
+                  first one.
                 </div>
               ) : (
                 <>
                   {/* Desktop table */}
                   <div className="hidden sm:block overflow-x-auto rounded-lg border border-slate-200">
                     <table className="w-full text-sm">
-                      <thead className="bg-slate-50 text-xs text-slate-600 border-b">
+                      <thead className="text-xs border-b bg-blue-400 text-white">
                         <tr>
-                          <th className="p-2.5 text-left font-semibold">Date</th>
-                          <th className="p-2.5 text-left font-semibold">Batch</th>
-                          <th className="p-2.5 text-left font-semibold">Vendor</th>
-                          <th className="p-2.5 text-center font-semibold">Bought</th>
-                          <th className="p-2.5 text-center font-semibold">Left</th>
-                          <th className="p-2.5 text-right font-semibold">Buy price</th>
-                          <th className="p-2.5 text-right font-semibold">Sell price</th>
+                          <th className="p-2.5 text-left font-semibold">
+                            Date
+                          </th>
+                          <th className="p-2.5 text-left font-semibold">
+                            Batch
+                          </th>
+                          <th className="p-2.5 text-left font-semibold">
+                            Vendor
+                          </th>
+                          <th className="p-2.5 text-center font-semibold">
+                            Bought
+                          </th>
+                          <th className="p-2.5 text-center font-semibold">
+                            Left
+                          </th>
+                          <th className="p-2.5 text-right font-semibold">
+                            Buy price
+                          </th>
+                          <th className="p-2.5 text-right font-semibold">
+                            Sell price
+                          </th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
                         {sortedHistory.map((entry) => (
-                          <tr key={entry.id} className="hover:bg-slate-50">
-                            <td className="p-2.5 whitespace-nowrap">{entry.receivedDate || "—"}</td>
-                            <td className="p-2.5 font-semibold">{entry.batchNumber || "—"}</td>
-                            <td className="p-2.5">{entry.vendor?.vendorName || "N/A"}</td>
-                            <td className="p-2.5 text-center">{entry.initialQuantity ?? 0}</td>
+                          <tr
+                            key={entry.id}
+                            className="hover:bg-slate-50"
+                          >
+                            <td className="p-2.5 whitespace-nowrap">
+                              {entry.receivedDate || "—"}
+                            </td>
+                            <td className="p-2.5 font-semibold">
+                              {entry.batchNumber || "—"}
+                            </td>
+                            <td className="p-2.5">
+                              {entry.vendor?.vendorName || "N/A"}
+                            </td>
+                            <td className="p-2.5 text-center">
+                              {entry.initialQuantity ?? 0}
+                            </td>
                             <td className="p-2.5 text-center">
                               <span
                                 className={`inline-block min-w-8 rounded-full px-2 py-0.5 text-xs font-bold ${
@@ -527,7 +620,8 @@ const ProductDetailsModal = ({
                               Batch {entry.batchNumber || "—"}
                             </p>
                             <p className="text-xs text-slate-500">
-                              {entry.receivedDate || "—"} · {entry.vendor?.vendorName || "N/A"}
+                              {entry.receivedDate || "—"} ·{" "}
+                              {entry.vendor?.vendorName || "N/A"}
                             </p>
                           </div>
                           <span
@@ -543,15 +637,21 @@ const ProductDetailsModal = ({
                         <div className="mt-2 grid grid-cols-3 gap-2 text-center text-xs">
                           <div className="rounded bg-slate-50 py-1">
                             <p className="text-slate-500">Bought</p>
-                            <p className="font-bold text-slate-900">{entry.initialQuantity ?? 0}</p>
+                            <p className="font-bold text-slate-900">
+                              {entry.initialQuantity ?? 0}
+                            </p>
                           </div>
                           <div className="rounded bg-slate-50 py-1">
                             <p className="text-slate-500">Buy</p>
-                            <p className="font-bold text-blue-700">{money(entry.purchasePrice)}</p>
+                            <p className="font-bold text-blue-700">
+                              {money(entry.purchasePrice)}
+                            </p>
                           </div>
                           <div className="rounded bg-slate-50 py-1">
                             <p className="text-slate-500">Sell</p>
-                            <p className="font-bold text-emerald-700">{money(entry.sellingPrice)}</p>
+                            <p className="font-bold text-emerald-700">
+                              {money(entry.sellingPrice)}
+                            </p>
                           </div>
                         </div>
                       </div>
@@ -568,15 +668,20 @@ const ProductDetailsModal = ({
               title="Stock movements"
               right={
                 <span className="text-xs font-semibold text-slate-500">
-                  {movements.length} {movements.length === 1 ? "entry" : "entries"} · newest first
+                  {movements.length}{" "}
+                  {movements.length === 1 ? "entry" : "entries"} · newest first
                 </span>
               }
             >
               {movementsLoading ? (
-                <div className="py-8 text-center text-sm text-slate-500">Loading stock movements...</div>
+                <div className="py-8 text-center text-sm text-slate-500">
+                  Loading stock movements...
+                </div>
               ) : movementsError ? (
                 <div className="py-6 text-center rounded-lg bg-red-50 border border-red-100">
-                  <p className="text-sm font-semibold text-red-600">Could not load stock movements</p>
+                  <p className="text-sm font-semibold text-red-600">
+                    Could not load stock movements
+                  </p>
                   <button
                     type="button"
                     onClick={() => refetchMovements()}
@@ -586,49 +691,88 @@ const ProductDetailsModal = ({
                   </button>
                 </div>
               ) : movements.length === 0 ? (
-                <div className="py-8 text-center text-sm text-slate-500">No stock movements yet.</div>
+                <div className="py-8 text-center text-sm text-slate-500">
+                  No stock movements yet.
+                </div>
               ) : (
                 <div className="overflow-x-auto rounded-lg border border-slate-200">
-                  <table className="w-full min-w-[640px] text-sm">
-                    <thead className="bg-slate-50 text-xs text-slate-600 border-b">
+                  <table className="w-full min-w-160 text-sm">
+                    <thead className="text-xs border-b bg-blue-400 text-white">
                       <tr>
                         <th className="p-2.5 text-left font-semibold">Date</th>
                         <th className="p-2.5 text-left font-semibold">Type</th>
-                        <th className="p-2.5 text-left font-semibold">Vendor</th>
-                        <th className="p-2.5 text-center font-semibold">Before</th>
-                        <th className="p-2.5 text-center font-semibold">Change</th>
-                        <th className="p-2.5 text-center font-semibold">After</th>
-                        <th className="p-2.5 text-right font-semibold">Buy price</th>
-                        <th className="p-2.5 text-left font-semibold">Remarks</th>
+                        <th className="p-2.5 text-left font-semibold">
+                          Vendor
+                        </th>
+                        <th className="p-2.5 text-center font-semibold">
+                          Before
+                        </th>
+                        <th className="p-2.5 text-center font-semibold">
+                          Change
+                        </th>
+                        <th className="p-2.5 text-center font-semibold">
+                          After
+                        </th>
+                        <th className="p-2.5 text-right font-semibold">
+                          Buy price
+                        </th>
+                        <th className="p-2.5 text-left font-semibold">
+                          Remarks
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {[...movements]
-                        .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")) || (b.id ?? 0) - (a.id ?? 0))
+                        .sort(
+                          (a, b) =>
+                            String(b.createdAt || "").localeCompare(
+                              String(a.createdAt || ""),
+                            ) || (b.id ?? 0) - (a.id ?? 0),
+                        )
                         .map((m) => {
                           const change = Number(m.addedQuantity || 0);
                           return (
-                            <tr key={m.id} className="hover:bg-slate-50">
+                            <tr
+                              key={m.id}
+                              className="hover:bg-slate-50"
+                            >
                               <td className="p-2.5 whitespace-nowrap">
-                                {m.createdAt ? new Date(m.createdAt).toLocaleString() : "—"}
+                                {m.createdAt
+                                  ? new Date(m.createdAt).toLocaleString()
+                                  : "—"}
                               </td>
                               <td className="p-2.5 font-semibold">
-                                {String(m.transactionType || "—").replaceAll("_", " ")}
+                                {String(m.transactionType || "—").replaceAll(
+                                  "_",
+                                  " ",
+                                )}
                               </td>
-                              <td className="p-2.5">{m.vendor?.vendorName || "—"}</td>
-                              <td className="p-2.5 text-center">{m.previousStock ?? "—"}</td>
+                              <td className="p-2.5">
+                                {m.vendor?.vendorName || "—"}
+                              </td>
+                              <td className="p-2.5 text-center">
+                                {m.previousStock ?? "—"}
+                              </td>
                               <td
                                 className={`p-2.5 text-center font-bold ${
-                                  change < 0 ? "text-red-600" : "text-emerald-700"
+                                  change < 0
+                                    ? "text-red-600"
+                                    : "text-emerald-700"
                                 }`}
                               >
                                 {change > 0 ? `+${change}` : change}
                               </td>
-                              <td className="p-2.5 text-center">{m.newStock ?? "—"}</td>
-                              <td className="p-2.5 text-right text-blue-700 font-semibold">
-                                {m.storePrice != null ? money(m.storePrice) : "—"}
+                              <td className="p-2.5 text-center">
+                                {m.newStock ?? "—"}
                               </td>
-                              <td className="p-2.5 text-xs text-slate-600">{m.remarks || "—"}</td>
+                              <td className="p-2.5 text-right text-blue-700 font-semibold">
+                                {m.storePrice != null
+                                  ? money(m.storePrice)
+                                  : "—"}
+                              </td>
+                              <td className="p-2.5 text-xs text-slate-600">
+                                {m.remarks || "—"}
+                              </td>
                             </tr>
                           );
                         })}
@@ -677,10 +821,16 @@ const Kpi = ({
 }) => (
   <div className="rounded-xl border border-slate-200 bg-white p-3 min-w-0">
     <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-500">
-      <Icon size={14} className={iconClass} />
+      <Icon
+        size={14}
+        className={iconClass}
+      />
       {label}
     </div>
-    <p className={`mt-1 text-xl font-extrabold leading-tight truncate ${valueClass}`} title={String(value)}>
+    <p
+      className={`mt-1 text-xl font-extrabold leading-tight truncate ${valueClass}`}
+      title={String(value)}
+    >
       {value}
     </p>
     <p className="mt-1 text-[11px] text-slate-500 truncate">{hint}</p>
@@ -690,14 +840,22 @@ const Kpi = ({
 const Field = ({label, value}) => (
   <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 min-w-0">
     <p className="text-xs text-slate-500">{label}</p>
-    <p className="mt-0.5 text-sm font-semibold text-slate-900 break-words">{value}</p>
+    <p className="mt-0.5 text-sm font-semibold text-slate-900 wrap-break-words">
+      {value}
+    </p>
   </div>
 );
 
 const Row = ({label, value, valueClass = "text-slate-900", strong = false}) => (
   <div className="flex items-center justify-between gap-3 py-2.5">
-    <span className={strong ? "font-semibold text-slate-800" : "text-slate-600"}>{label}</span>
-    <span className={`${strong ? "text-base font-extrabold" : "font-semibold"} ${valueClass}`}>
+    <span
+      className={strong ? "font-semibold text-slate-800" : "text-slate-600"}
+    >
+      {label}
+    </span>
+    <span
+      className={`${strong ? "text-base font-extrabold" : "font-semibold"} ${valueClass}`}
+    >
       {value}
     </span>
   </div>
@@ -706,11 +864,15 @@ const Row = ({label, value, valueClass = "text-slate-900", strong = false}) => (
 const GstChip = ({label, applied, pct}) => (
   <div
     className={`rounded-lg border px-3 py-2 ${
-      applied ? "border-emerald-200 bg-emerald-50" : "border-slate-200 bg-slate-50"
+      applied
+        ? "border-emerald-200 bg-emerald-50"
+        : "border-slate-200 bg-slate-50"
     }`}
   >
     <p className="text-xs text-slate-500">{label}</p>
-    <p className={`mt-0.5 text-sm font-bold ${applied ? "text-emerald-700" : "text-slate-400"}`}>
+    <p
+      className={`mt-0.5 text-sm font-bold ${applied ? "text-emerald-700" : "text-slate-400"}`}
+    >
       {applied ? `${pct ?? 0}%` : "Not applied"}
     </p>
   </div>

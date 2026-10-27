@@ -21,7 +21,7 @@ export default function LowStockTable({products, loading, threshold}) {
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="border-b bg-slate-50 text-left">
+              <tr className="border-b text-left bg-blue-400 text-white">
                 <th className="px-2.5 py-2">Product</th>
                 <th className="px-2.5 py-2 text-right">Current stock</th>
                 <th className="px-2.5 py-2 text-right">Status</th>
