@@ -5,7 +5,7 @@ import {ArrowLeft, Eye, RefreshCw, Search} from "lucide-react";
 import {fetchVendorBills} from "../../api/vendorServiceApi";
 import {vendorBillInstallmentApi} from "../../api/installmentApi";
 import Pagination from "../../Components/Pagination";
-import {usePagination} from "../../hooks/usePagination";
+
 import VendorBillDetailModal, {money} from "./VendorBillDetailModal";
 import Toast from "../../Components/Toast";
 import InstallmentPlanModal from "../../Components/InstallmentPlanModal";
@@ -13,6 +13,7 @@ import VendorBillStatusBadge, {
   VENDOR_BILL_STATUS_FILTERS,
   getVendorBillPaymentDisplay,
 } from "../../Components/VendorBillStatusBadge";
+import {usePagination} from "../../Hooks/usePagination";
 
 const SummaryCard = ({label, value, tone = "blue"}) => {
   // Pre-configured color schemes based on the tone prop
