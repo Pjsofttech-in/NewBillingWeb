@@ -10,7 +10,7 @@ import Radio from "../../Components/Form/Radio";
 
 import StatCard from "./StatCard";
 import {fetchPaymentReceivingAccounts} from "../../api/storeSettingsApi";
-import ConfirmModal from "../../Components/Confirmmodal";
+import ConfirmModal from "../../Components/ConfirmModal";
 
 const calcLine = (product, qtyRaw, extraRaw) => {
   const qty = Math.max(0, Number(qtyRaw) || 0);
