@@ -1,6 +1,13 @@
+/*
+ * Reusable dropdown.
+ *  - react-hook-form:  <Select name="x" register={register} rules={...} options={...} />
+ *  - plain state:      <Select value={v} onChange={(e) => setV(e.target.value)} options={...} />
+ *    (add showPlaceholder={false} when the dropdown always has a value, e.g. Paid / Pending)
+ */
 const Select = ({
   label,
   name,
+  id,
   options = [],
   register,
   rules = {},
@@ -9,16 +16,26 @@ const Select = ({
   disabled = false,
   placeholder = "Select",
   allowEmpty = false,
+  showPlaceholder = true,
+  value,
+  onChange,
   className = "",
 }) => {
   const registerProps =
     typeof register === "function" ? register(name, rules) : {};
+  const controlled = value !== undefined;
+  const selectId = id || name;
+
+  // controlled: value + onChange | react-hook-form: registerProps | otherwise: uncontrolled with an optional onChange
+  const valueProps = controlled
+    ? {value, onChange}
+    : {defaultValue: "", ...registerProps, ...(onChange ? {onChange} : {})};
 
   return (
     <div className="w-full">
       {label && (
         <label
-          htmlFor={name}
+          htmlFor={selectId}
           className="block mb-1 text-xs sm:text-sm font-medium text-slate-700"
         >
           {label}
@@ -27,10 +44,9 @@ const Select = ({
       )}
 
       <select
-        id={name}
+        id={selectId}
         disabled={disabled}
-        defaultValue=""
-        {...registerProps}
+        {...valueProps}
         className={`
           w-full px-3 py-2 border rounded-md bg-white text-sm sm:text-base
           outline-none
@@ -41,9 +57,11 @@ const Select = ({
           ${className}
         `}
       >
-        <option value="" disabled={!allowEmpty}>
-          {placeholder}
-        </option>
+        {showPlaceholder && (
+          <option value="" disabled={!allowEmpty}>
+            {placeholder}
+          </option>
+        )}
 
         {options.map((opt) => (
           <option

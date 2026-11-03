@@ -38,6 +38,19 @@ const toSentence = (value) =>
 const BADGE = "inline-block rounded-full px-2.5 py-1 text-xs font-semibold";
 
 const getPaymentDisplay = (order, paidAmount, pendingAmount) => {
+  // Cancelled order: money already received has to be given back -> REFUND; nothing received -> Cancelled
+  if (order.status === "CANCELLED") {
+    const refund = Number(order.refundAmount ?? paidAmount ?? 0);
+    return refund > 0.009
+      ? {
+          label: "Refund",
+          style: "bg-rose-100 text-rose-700",
+          title: `Refund to customer: ${refund.toFixed(2)}`,
+          opensInstallments: Boolean(order.hasInstallmentPlan),
+        }
+      : {label: "Cancelled", style: "bg-slate-200 text-slate-600"};
+  }
+
   if (order.installmentsComplete || pendingAmount <= 0.009) {
     return {
       label: "Complete",
@@ -111,7 +124,14 @@ const PaymentBadge = ({order, display, onOpenInstallments, className = ""}) => {
   const classes = `${BADGE} ${display.style} ${className}`;
 
   if (!display.opensInstallments) {
-    return <span className={classes}>{display.label}</span>;
+    return (
+      <span
+        className={classes}
+        title={display.title}
+      >
+        {display.label}
+      </span>
+    );
   }
 
   return (
@@ -573,7 +593,7 @@ export default function OrderList({
           </div>
 
           {/* DESKTOP TABLE VIEW */}
-          <div className="hidden w-full border-y border-slate-200 bg-white lg:block">
+          <div className="hidden w-full overflow-x-auto border-y border-slate-200 bg-white lg:block">
             <table className="w-full border-collapse text-left text-xs text-slate-700">
               <thead className="border-b border-slate-200 bg-blue-400 text-white">
                 <tr>

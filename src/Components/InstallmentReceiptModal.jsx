@@ -105,7 +105,7 @@ export default function InstallmentReceiptModal({
 
   return (
     <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/60 p-4">
-      <div className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+      <div className="flex max-h-[92dvh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
         <div className="flex items-center justify-between bg-blue-500 px-5 py-3 text-white">
           <div className="flex items-center gap-2">
             <Receipt className="h-5 w-5 text-blue-100" />
@@ -173,6 +173,7 @@ export default function InstallmentReceiptModal({
             </div>
 
             {payments.length > 0 && (
+              <div style={{overflowX: "auto"}}>
               <table>
                 <thead>
                   <tr>
@@ -195,6 +196,7 @@ export default function InstallmentReceiptModal({
                   ))}
                 </tbody>
               </table>
+              </div>
             )}
 
             <div className="rc-totals">

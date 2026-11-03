@@ -7,10 +7,12 @@ import {
   markVendorBillPaymentDone,
 } from "../../api/vendorServiceApi";
 import {vendorBillInstallmentApi} from "../../api/installmentApi";
-import InstallmentPlanModal from "../../Components/InstallmentPlanModal";
 import Toast from "../../Components/Toast";
 import VendorBillStatusBadge from "../../Components/VendorBillStatusBadge";
 import {money} from "../../utils/format";
+import {lazyModal} from "../../utils/lazyModal";
+
+const InstallmentPlanModal = lazyModal(() => import("../../Components/InstallmentPlanModal"));
 export {money};
 
 
@@ -399,7 +401,7 @@ const VendorBillDetailModal = ({bill, onClose}) => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3">
-      <div className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-slate-50 shadow-2xl">
+      <div className="flex max-h-[92dvh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-slate-50 shadow-2xl">
         <div className="flex items-start justify-between border-b bg-white px-5 py-4">
           <div>
             <h3 className="text-lg font-bold">{bill.billNumber}</h3>

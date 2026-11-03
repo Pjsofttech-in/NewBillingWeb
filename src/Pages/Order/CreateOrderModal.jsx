@@ -7,8 +7,10 @@ import CustomerModal from "../Settings/Customer/CustomerModal";
 import Input from "../../Components/Form/Input";
 import Select from "../../Components/Form/Select";
 import Radio from "../../Components/Form/Radio";
+
 import StatCard from "./StatCard";
 import {fetchPaymentReceivingAccounts} from "../../api/storeSettingsApi";
+import ConfirmModal from "../../Components/Confirmmodal";
 
 const calcLine = (product, qtyRaw, extraRaw) => {
   const qty = Math.max(0, Number(qtyRaw) || 0);
@@ -90,6 +92,7 @@ const CreateOrderModal = ({
 }) => {
   const [isNewCustomerModalOpen, setIsNewCustomerModalOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [pendingRefund, setPendingRefund] = useState(null); // form data waiting for the Yes / No refund confirmation
 
   const {
     register,
@@ -111,6 +114,7 @@ const CreateOrderModal = ({
   const customerType = useWatch({control, name: "customerType"});
   const paymentStatus = useWatch({control, name: "paymentStatus"});
   const paymentMethod = useWatch({control, name: "paymentMethod"});
+  const editStatus = useWatch({control, name: "status"});
   const isCashPayment = paymentMethod === "CASH";
 
   const {data: receivingAccounts = []} = useQuery({
@@ -337,9 +341,18 @@ const CreateOrderModal = ({
 
   const overallTotals = calculateOverallTotals();
 
-  const handleExistingOrderSubmit = async (data) => {
+  const handleExistingOrderSubmit = async (data, refundConfirmed = false) => {
     setErrorMessage("");
     const isCancelling = isEditMode && data.status === "CANCELLED";
+    // Cancelling an order that already received money = REFUND -> ask Yes / No first
+    if (
+      isCancelling &&
+      !refundConfirmed &&
+      Number(editingOrder?.paidAmount || 0) > 0.009
+    ) {
+      setPendingRefund(data);
+      return;
+    }
     data = {...data, orderItems: mergeDuplicateItems(data.orderItems)};
 
     if (
@@ -432,7 +445,7 @@ const CreateOrderModal = ({
   return (
     <>
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-3">
-        <div className="flex max-h-[95vh] w-full max-w-6xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl">
+        <div className="flex max-h-[95dvh] w-full max-w-6xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl">
           {/* Header */}
           <div className="flex items-center justify-between bg-blue-600 px-5 py-3">
             <h2 className="text-lg font-semibold text-white">
@@ -455,7 +468,7 @@ const CreateOrderModal = ({
           )}
 
           <form
-            onSubmit={handleSubmit(handleExistingOrderSubmit)}
+            onSubmit={handleSubmit((data) => handleExistingOrderSubmit(data))}
             className="flex-1 space-y-5 overflow-y-auto p-5"
           >
             {/* ========== Customer + Order Date (same line) ========== */}
@@ -751,7 +764,7 @@ const CreateOrderModal = ({
                             </span>
                           )}
                           {totalSave > 0 && (
-                            <span className="font-semibold text-emerald-700">
+                            <span className="font-medium text-emerald-700">
                               Total discount {rupees(totalSave)} (
                               {totalSavePct.toFixed(1)}%)
                             </span>
@@ -922,6 +935,18 @@ const CreateOrderModal = ({
                     />
                   </div>
                 )}
+
+              {/* Cancelling an order that already has money received -> payment status REFUND */}
+              {isEditMode &&
+                editStatus === "CANCELLED" &&
+                Number(editingOrder?.paidAmount || 0) > 0.009 && (
+                  <p className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-800">
+                    ₹{Number(editingOrder.paidAmount).toFixed(2)} has already
+                    been received for this order. After cancelling, the stock
+                    goes back and the payment status becomes <b>REFUND</b>, so
+                    you know this amount is to be returned to the customer.
+                  </p>
+                )}
             </div>
 
             {/* Actions */}
@@ -977,6 +1002,22 @@ const CreateOrderModal = ({
         onClose={() => setIsNewCustomerModalOpen(false)}
         onSubmit={handleNewCustomerCreate}
         isSubmitting={isSubmitting}
+      />
+
+      <ConfirmModal
+        isOpen={Boolean(pendingRefund)}
+        title="Mark this order as REFUND?"
+        tone="warning"
+        isLoading={isSubmitting}
+        message={`The order will be cancelled, the stock goes back, and ₹${Number(editingOrder?.paidAmount || 0).toFixed(2)} received from the customer is to be returned.`}
+        confirmText="Yes"
+        cancelText="No"
+        onConfirm={() => {
+          const data = pendingRefund;
+          setPendingRefund(null);
+          handleExistingOrderSubmit(data, true);
+        }}
+        onCancel={() => setPendingRefund(null)}
       />
     </>
   );

@@ -3,10 +3,12 @@ import {useQuery} from "@tanstack/react-query";
 import {CalendarClock, Clock, HandCoins, Landmark, Search} from "lucide-react";
 
 import {orderInstallmentApi} from "../../api/installmentApi";
-import InstallmentPlanModal from "../../Components/InstallmentPlanModal";
 import Toast from "../../Components/Toast";
 import StatCard from "../Dashboard/StatCard";
 import {money} from "../Dashboard/dashboardUtils";
+import {lazyModal} from "../../utils/lazyModal";
+
+const InstallmentPlanModal = lazyModal(() => import("../../Components/InstallmentPlanModal"));
 
 // Customer installments only. Vendor bills (and their installments) have their own page: Vendor Bills.
 const TAB = "order";

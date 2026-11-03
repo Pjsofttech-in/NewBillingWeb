@@ -154,7 +154,7 @@ const ProductDetailsModal = ({
         role="dialog"
         aria-modal="true"
         aria-label={`Details of ${product.productName}`}
-        className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-5xl max-h-[94vh] sm:max-h-[92vh] overflow-hidden flex flex-col"
+        className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-5xl max-h-[94dvh] sm:max-h-[92dvh] overflow-hidden flex flex-col"
       >
         {/* ============ HEADER ============ */}
         <div className="shrink-0 px-4 sm:px-5 pt-4 pb-3 bg-linear-to-r from-slate-50 to-blue-50 border-b flex items-start justify-between gap-3">

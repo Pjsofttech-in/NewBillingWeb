@@ -71,7 +71,7 @@ const CustomerModal = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="bg-white w-full max-w-3xl rounded-2xl shadow-2xl overflow-hidden border border-slate-100 flex flex-col max-h-[90vh]">
+      <div className="bg-white w-full max-w-3xl rounded-2xl shadow-2xl overflow-hidden border border-slate-100 flex flex-col max-h-[90dvh]">
         {/* Modal Header */}
         <div className="flex justify-between items-center px-6 py-4 bg-slate-50 border-b border-slate-200">
           <h3 className="text-lg font-bold text-slate-800">

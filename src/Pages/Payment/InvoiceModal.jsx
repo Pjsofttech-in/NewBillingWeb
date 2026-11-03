@@ -83,7 +83,7 @@ export default function InvoiceModal({order, isOpen, onClose}) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+      <div className="flex max-h-[92dvh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
         <div className="flex items-center justify-between bg-blue-500 px-6 py-4 text-white">
           <div className="flex items-center gap-2">
             <FileText className="h-5 w-5 text-blue-100" />
@@ -243,7 +243,7 @@ export default function InvoiceModal({order, isOpen, onClose}) {
               </p>
             ) : (
               <>
-                <div className="mb-2 grid grid-cols-3 gap-3">
+                <div className="mb-2 grid grid-cols-1 gap-3 sm:grid-cols-3">
                   <div className="rounded-lg bg-emerald-50 p-3 text-sm">
                     <p>Paid</p>
                     <b>{money(paid)}</b>

@@ -404,7 +404,7 @@ export default function ProductModal({isOpen, onClose, onSuccess}) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-3 sm:p-5 backdrop-blur-sm">
       {/* Increased max-width from max-w-6xl to max-w-7xl */}
-      <div className="flex max-h-[92vh] w-full max-w-7xl flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl text-xs">
+      <div className="flex max-h-[92dvh] w-full max-w-7xl flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl text-xs">
         {/* ================= HEADER ================= */}
         <div className="flex shrink-0 items-center justify-between border-b bg-blue-500 px-5 py-2.5 text-white">
           <div>

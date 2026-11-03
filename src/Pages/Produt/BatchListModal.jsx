@@ -35,7 +35,7 @@ const BatchListModal = ({isOpen, product, onClose}) => {
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-5xl max-h-[92vh] overflow-hidden flex flex-col"
+        className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-5xl max-h-[92dvh] overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="shrink-0 px-5 py-4 border-b bg-gradient-to-r from-slate-50 to-blue-50 flex justify-between items-start gap-4">
@@ -75,7 +75,8 @@ const BatchListModal = ({isOpen, product, onClose}) => {
           ) : batches.length === 0 ? (
             <p className="p-8 text-center text-slate-500">No batches found.</p>
           ) : (
-            <table className="w-full text-xs border-collapse">
+            <div className="overflow-x-auto">
+            <table className="min-w-[560px] w-full text-xs border-collapse">
               <thead>
                 <tr className="border-b bg-blue-400 text-white">
                   <th className="p-3 text-left">Batch</th>
@@ -123,6 +124,7 @@ const BatchListModal = ({isOpen, product, onClose}) => {
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </div>
 

@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import PortalGrid from "./Portalgrid";
-import AccessNav from "./Accessnav";
-import BrandMark from "./Brandmark";
+import PortalGrid from "./PortalGrid";
+import AccessNav from "./AccessNav";
+import BrandMark from "./BrandMark";
 import LoginPanel from "./Loginpanel";
 import { authTabs } from "../../data/AuthTabs";
 import { useNavigate } from "react-router-dom";
@@ -51,7 +51,7 @@ export default function LoginPortal() {
   };
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center bg-slate-50 p-6 font-sans">
+    <div className="relative flex min-h-dvh items-center justify-center bg-slate-50 p-3 font-sans sm:p-6">
       {/* Background Grid Pattern */}
       <div
         className="pointer-events-none absolute inset-0 opacity-100"
@@ -64,16 +64,16 @@ export default function LoginPortal() {
         }}
       />
 
-      <div className="relative z-10 flex flex-col items-center justify-center gap-6 md:flex-row md:items-stretch">
+      <div className="relative z-10 flex w-full flex-col items-center justify-center gap-4 sm:gap-6 md:w-auto md:flex-row md:items-stretch">
         {/* Left Side: Application Portals Grid */}
         <div className="flex">
           <PortalGrid />
         </div>
 
         {/* Right Side Card */}
-        <div className="flex w-full md:w-195 overflow-hidden rounded-[28px] bg-white shadow-xl shadow-slate-200/70 border border-slate-100/80">
+        <div className="flex w-full max-w-195 flex-col overflow-hidden rounded-[28px] sm:flex-row md:w-195 bg-white shadow-xl shadow-slate-200/70 border border-slate-100/80">
           {/* Left Navigation Sidebar */}
-          <div className="flex w-55 shrink-0 flex-col justify-between border-r border-slate-200 py-6 bg-slate-50">
+          <div className="flex w-full shrink-0 flex-col justify-between border-b border-slate-200 bg-slate-50 py-4 sm:w-55 sm:border-b-0 sm:border-r sm:py-6">
             <div className="flex flex-col gap-4 w-full">
               <div className="px-6 py-2 border-b border-slate-200">
                 <BrandMark />
@@ -94,7 +94,7 @@ export default function LoginPortal() {
           </div>
 
           {/* Right Login Panel Container */}
-          <div className="flex flex-1 items-center justify-center bg-white p-10">
+          <div className="flex flex-1 items-center justify-center bg-white p-5 sm:p-10">
             <LoginPanel
               tab={activeTab}
               register={register}

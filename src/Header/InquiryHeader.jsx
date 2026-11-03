@@ -4,7 +4,7 @@
 import {NavLink} from "react-router-dom";
 
 const tabClass = ({isActive}) =>
-  `flex-1 text-center py-1 sm:py-1.5 px-2 sm:px-3 rounded-full text-xs sm:text-sm font-bold transition-all duration-200 whitespace-nowrap ${
+  `keep-bold shrink-0 flex-1 text-center py-1.5 sm:py-1.5 px-3 rounded-full text-xs sm:text-sm font-bold transition-all duration-200 whitespace-nowrap ${
     isActive
       ? "bg-white text-slate-800 shadow-sm border"
       : "text-white hover:bg-blue-800 hover:text-white"
@@ -13,7 +13,7 @@ const tabClass = ({isActive}) =>
 const InquiryHeader = () => {
   return (
     <div className="p-0 px-1 sm:px-2 pt-1 w-full">
-      <nav className="mx-auto flex w-full max-w-full items-center justify-between gap-1 rounded-full bg-blue-500 p-1 shadow-inner border overflow-x-auto">
+      <nav className="mx-auto flex w-full max-w-full items-center justify-between gap-1 rounded-full bg-blue-500 p-1 shadow-inner border overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <NavLink to="/" className={tabClass}>
           Dashboard
         </NavLink>

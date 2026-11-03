@@ -10,12 +10,14 @@ import {fetchProductTypes} from "../../api/productTypeServiceApi";
 import {fetchSubCategories} from "../../api/subCategoryApi";
 
 import ProductList from "./ProductList";
-import ProductModal from "./ProductModal";
-import UpdateStockModal from "./UpdateStockModal";
 import SearchableSelect from "../../Components/Form/SearchableSelect";
 import SearchBar from "../../Components/SearchBar";
 import ExportButtons from "../../Components/ExportButtons";
 import Toast from "../../Components/Toast";
+import {lazyModal} from "../../utils/lazyModal";
+
+const ProductModal = lazyModal(() => import("./ProductModal"));
+const UpdateStockModal = lazyModal(() => import("./UpdateStockModal"));
 
 const EMPTY_FILTERS = {
   productName: "",
@@ -278,28 +280,14 @@ const AddProduct = () => {
       <ProductModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        onSuccess={(planError) =>
-          planError
-            ? showToast(
-                `Product created, but the installment plan failed: ${planError}. Create it from Vendor Bills.`,
-                "error",
-              )
-            : showToast("Product created successfully!", "success")
-        }
+        onSuccess={() => showToast("Product created successfully!", "success")}
       />
 
       <UpdateStockModal
         isOpen={isStockModalOpen}
         productsList={products}
         onClose={() => setIsStockModalOpen(false)}
-        onSuccess={(updated, planError) =>
-          planError
-            ? showToast(
-                `Stock updated, but the installment plan failed: ${planError}. Create it from Vendor Bills.`,
-                "error",
-              )
-            : showToast("Stock updated successfully!", "success")
-        }
+        onSuccess={() => showToast("Stock updated successfully!", "success")}
       />
     </div>
   );

@@ -11,7 +11,7 @@ const InquiryLayout = () => {
   const isProfilePage = location.pathname === "/profile";
 
   return (
-    <div className="flex h-screen w-full flex-col bg-slate-100 font-sans overflow-hidden">
+    <div className="flex h-dvh w-full flex-col bg-slate-100 font-sans overflow-hidden">
       {/* Top Main Navbar */}
       <Navbar />
 
@@ -21,7 +21,7 @@ const InquiryLayout = () => {
         <div className="flex flex-1 flex-col overflow-y-auto w-full min-w-0">
           {!isProfilePage && <InquiryHeader />}
 
-          <main className="flex-1 p-2 sm:p-4 w-full">
+          <main className="mx-auto w-full max-w-[2200px] flex-1 p-2 sm:p-4">
             <Suspense
               fallback={
                 <div className="flex items-center justify-center py-16">

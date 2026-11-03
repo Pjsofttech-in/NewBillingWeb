@@ -18,7 +18,7 @@ const DuesPage = lazy(() => import("./Pages/Dues/DuesPage"));
 const App = () => {
   const {isAuthenticated} = useAuth();
   return (
-    <div className="min-h-screen w-full bg-slate-100 text-slate-900 antialiased">
+    <div className="min-h-dvh w-full bg-slate-100 text-slate-900 antialiased">
       <Routes>
         <Route
           path="/login"

@@ -30,12 +30,14 @@ import {useMutation, useQueryClient} from "@tanstack/react-query";
 import {deleteProduct} from "../../api/productApi";
 import Toast from "../../Components/Toast";
 import DeleteConfirmModal from "../../Components/DeleteConfirmModal";
-import UpdateStockModal from "./UpdateStockModal";
-import ProductDetailsModal from "./ProductDetailsModal";
-import BatchListModal from "./BatchListModal";
 import Pagination from "../../Components/Pagination";
 import {usePagination} from "../../Hooks/usePagination";
 import {inr, round2} from "../../utils/vendorPricing";
+import {lazyModal} from "../../utils/lazyModal";
+
+const UpdateStockModal = lazyModal(() => import("./UpdateStockModal"));
+const ProductDetailsModal = lazyModal(() => import("./ProductDetailsModal"));
+const BatchListModal = lazyModal(() => import("./BatchListModal"));
 
 // Color tones
 const TONES = {
@@ -172,14 +174,7 @@ const ProductList = ({products = [], toolbar = null}) => {
         isOpen={Boolean(productToUpdateStock)}
         product={productToUpdateStock}
         onClose={() => setProductToUpdateStock(null)}
-        onSuccess={(updated, planError) =>
-          planError
-            ? showToast(
-                `Stock updated, but the installment plan failed: ${planError}. Create it from Vendor Bills.`,
-                "error",
-              )
-            : showToast("Stock updated!", "success")
-        }
+        onSuccess={() => showToast("Stock updated!", "success")}
       />
 
       <DeleteConfirmModal
@@ -325,7 +320,7 @@ const ProductList = ({products = [], toolbar = null}) => {
       </div>
 
       {/* Desktop Compact Table View */}
-      <div className="hidden lg:block w-full bg-white border-y border-slate-200 overflow-hidden">
+      <div className="hidden lg:block w-full bg-white border-y border-slate-200 overflow-x-auto">
         <table className="w-full table-fixed text-left text-[11px] text-slate-700 border-collapse">
           <thead className="border-b border-slate-200 text-[10px] font-bold uppercase bg-blue-400 text-white">
             <tr>

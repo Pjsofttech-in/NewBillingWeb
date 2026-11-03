@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,600&display=swap");
+/* Poppins is loaded by the <link> tags in index.html (preconnect + display=swap) */
 @import "tailwindcss";
 
 @theme {
@@ -57,4 +57,105 @@ select,
 textarea,
 button {
   font-family: inherit;
+}
+
+
+/* ------------------------------------------------------------------
+   Responsive rules (phones, tablets, laptops, large screens)
+   ------------------------------------------------------------------ */
+
+/* Never let a stray wide element make the whole page scroll sideways */
+html,
+body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* No double-tap zoom delay on buttons / links, no text auto-resize in landscape */
+button,
+a,
+[role="button"] {
+  touch-action: manipulation;
+}
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* iPhones zoom the page when a field smaller than 16px is focused - keep fields at 16px on phones */
+@media (max-width: 639px) {
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+/* Pop-up windows: scroll inside the screen when the content is taller than the phone,
+   and keep the page behind from scrolling. "safe center" keeps the top reachable. */
+div.fixed.inset-0.flex {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+div.fixed.inset-0.flex.items-center {
+  align-items: safe center;
+}
+
+/* Tables: smooth horizontal swipe on touch screens */
+.overflow-x-auto {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Respect "reduce motion" */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+
+/* ------------------------------------------------------------------
+   Typography rules for the whole app
+   1) Normal weight everywhere. Bold only in table headers and buttons
+      (and the main menu tabs, which work like buttons: class "keep-bold").
+   2) Every word starts with a capital letter (display only - what is saved
+      stays as typed). Add Tailwind's "normal-case" / "lowercase" to a single
+      element (an e-mail address, a code) to turn it off.
+   ------------------------------------------------------------------ */
+
+/* 1) bold: these rules are outside the Tailwind layers, so they beat font-bold / font-semibold ... */
+:where(b, strong, h1, h2, h3, h4, h5, h6, .font-bold, .font-semibold, .font-extrabold, .font-black) {
+  font-weight: 400;
+}
+:where(th, button, [role="button"], input[type="button"], input[type="submit"], .keep-bold) {
+  font-weight: 700;
+}
+th *,
+button *,
+[role="button"] *,
+.keep-bold * {
+  font-weight: inherit;
+}
+
+/* 2) capital first letter of every word. Inside @layer base so utilities like "uppercase" still win. */
+@layer base {
+  body,
+  button,
+  select,
+  option,
+  optgroup {
+    text-transform: capitalize;
+  }
+  a[href^="mailto:"],
+  a[href^="tel:"],
+  code,
+  kbd,
+  pre {
+    text-transform: none;
+  }
 }

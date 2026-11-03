@@ -7,7 +7,8 @@ import {tomorrow, inputCls} from "./installmentHelpers";
 // Edit the installments that have no payment yet (amount / due date / add / remove).
 // Paid and partly paid installments stay as they are.
 export default function UpdateInstallmentsForm({
-  // orderId,
+  orderId,
+  focusId, // the installment whose invoice number was clicked
   installments,
   target,
   onSubmit,
@@ -17,6 +18,7 @@ export default function UpdateInstallmentsForm({
   const [rows, setRows] = useState(
     installments.map((i) => ({
       id: i.id,
+      number: i.installmentNumber,
       dueAmount: String(Number(i.dueAmount)),
       dueDate: i.dueDate,
       remark: i.remark || "",
@@ -35,12 +37,15 @@ export default function UpdateInstallmentsForm({
   const submit = (e) => {
     e.preventDefault();
     setError("");
-    if (Math.abs(left) > 0.004) {
+    // Less than the unpaid amount is fine: the rest stays unplanned and is added later with "Add installment"
+    if (left < -0.004) {
       setError(
-        left > 0
-          ? `${money(left)} is still not allocated to an installment`
-          : `Installments are ${money(-left)} more than the amount to be planned`,
+        `Installments are ${money(-left)} more than the amount to be planned`,
       );
+      return;
+    }
+    if (rows.length === 0) {
+      setError("Keep at least one installment");
       return;
     }
     onSubmit(
@@ -85,7 +90,7 @@ export default function UpdateInstallmentsForm({
         <table className="w-full border-collapse">
           <thead>
             <tr>
-              <th className={th}>Installment</th>
+              <th className={th}>Invoice No</th>
               <th className={th}>Amount</th>
               <th className={th}>Due Date</th>
               <th className={th}>Remark</th>
@@ -96,9 +101,17 @@ export default function UpdateInstallmentsForm({
             {rows.map((r, i) => (
               <tr
                 key={r.id || `new${i}`}
-                className={i % 2 === 0 ? "bg-slate-100" : "bg-white"}
+                className={
+                  r.id && r.id === focusId
+                    ? "bg-blue-100 outline-2 -outline-offset-2 outline-blue-500"
+                    : i % 2 === 0
+                      ? "bg-slate-100"
+                      : "bg-white"
+                }
               >
-                <td className={cell}>{r.id ? "Existing" : "New"}</td>
+                <td className={cell}>
+                  {r.id ? `INV-${orderId}-${r.number}` : "New"}
+                </td>
                 <td className={cell}>
                   <input
                     type="number"

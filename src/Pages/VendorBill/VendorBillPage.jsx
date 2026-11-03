@@ -6,14 +6,19 @@ import {fetchVendorBills} from "../../api/vendorServiceApi";
 import {vendorBillInstallmentApi} from "../../api/installmentApi";
 import Pagination from "../../Components/Pagination";
 
-import VendorBillDetailModal, {money} from "./VendorBillDetailModal";
+import VendorBillDetailModal from "./VendorBillDetailModal";
+import {money} from "../../utils/format";
 import Toast from "../../Components/Toast";
-import InstallmentPlanModal from "../../Components/InstallmentPlanModal";
 import VendorBillStatusBadge, {
   VENDOR_BILL_STATUS_FILTERS,
   getVendorBillPaymentDisplay,
 } from "../../Components/VendorBillStatusBadge";
 import {usePagination} from "../../Hooks/usePagination";
+import {lazyModal} from "../../utils/lazyModal";
+
+const InstallmentPlanModal = lazyModal(
+  () => import("../../Components/InstallmentPlanModal"),
+);
 
 const SummaryCard = ({label, value, tone = "blue"}) => {
   // Pre-configured color schemes based on the tone prop
@@ -220,7 +225,7 @@ const VendorBillPage = () => {
           </p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px] text-xs">
+            <table className="w-full min-w-225 text-xs">
               <thead className="text-[11px] uppercase tracking-wider font-bold bg-blue-400 text-white">
                 <tr>
                   <th className="px-2 py-2 text-left">Sr. No.</th>

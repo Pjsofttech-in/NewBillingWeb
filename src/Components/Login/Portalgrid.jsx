@@ -13,7 +13,7 @@ const portals = [
 
 export default function PortalGrid() {
   return (
-    <div className="w-80 rounded-[28px] bg-white p-6 shadow-xl shadow-slate-200/70 border border-slate-100/80 flex flex-col justify-between">
+    <div className="w-full max-w-80 rounded-[28px] md:w-80 bg-white p-6 shadow-xl shadow-slate-200/70 border border-slate-100/80 flex flex-col justify-between">
       <div>
         {/* Header Title */}
         <div className="mb-5 flex items-center gap-2">

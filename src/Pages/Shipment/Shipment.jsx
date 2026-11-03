@@ -16,8 +16,10 @@ import {fetchOrders, fetchOrderById} from "../../api/orderApi";
 import {fetchShippedBy} from "../../api/shippedByServiceApi";
 
 import ShipmentList from "./ShipmentList";
-import ShipmentModal from "./ShipmentModal";
 import Toast from "../../Components/Toast";
+import {lazyModal} from "../../utils/lazyModal";
+
+const ShipmentModal = lazyModal(() => import("./ShipmentModal"));
 
 const Shipment = () => {
   const queryClient = useQueryClient();

@@ -613,7 +613,7 @@ const ShipmentList = ({
           </div>
 
           {/* Desktop Table View */}
-          <div className="hidden w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs lg:block">
+          <div className="hidden w-full overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-xs lg:block">
             <table className="w-full table-fixed border-collapse text-left text-xs text-slate-700">
               <thead className="border-b border-slate-200 bg-blue-400 text-[11px] font-bold uppercase tracking-wide text-white">
                 <tr>

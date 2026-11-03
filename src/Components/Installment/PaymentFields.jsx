@@ -1,65 +1,65 @@
-import {METHODS, inputCls, labelCls} from "./installmentHelpers";
+import Select from "../Form/Select";
+import {METHOD_OPTIONS, fieldCls, fieldLabelCls} from "./installmentHelpers";
 
 // ------------------------------------------------------- payment method fields
 // Cash: no bank account and no transaction id. Everything else shows both.
+//  inline  -> fixed-width fields with labels, to sit on one line with their neighbours (create form)
+//  compact -> no labels, small fields, for inside a table row (pay an installment)
 export default function PaymentFields({
   isOrder,
-  accounts,
+  accounts = [],
   method,
   setMethod,
   accountId,
   setAccountId,
   reference,
   setReference,
+  inline = false,
+  compact = false,
 }) {
   const isCash = method === "CASH";
+  const box = compact ? "w-32" : inline ? "w-full sm:w-40" : "";
+  const selectCls = compact ? "py-1.5 sm:text-sm" : "";
+
   return (
     <>
-      <div>
-        <label className={labelCls}>Payment method</label>
-        <select
+      <div className={box}>
+        <Select
+          label={compact ? undefined : "Payment method"}
+          id={compact ? undefined : undefined}
           value={method}
           onChange={(e) => setMethod(e.target.value)}
-          className={inputCls}
-        >
-          {METHODS.map((m) => (
-            <option
-              key={m}
-              value={m}
-            >
-              {m.replace("_", " ")}
-            </option>
-          ))}
-        </select>
+          options={METHOD_OPTIONS}
+          showPlaceholder={false}
+          className={selectCls}
+        />
       </div>
+
       {!isCash && isOrder && (
-        <div>
-          <label className={labelCls}>Receiving account</label>
-          <select
+        <div className={box}>
+          <Select
+            label={compact ? undefined : "Receiving account"}
             value={accountId}
             onChange={(e) => setAccountId(e.target.value)}
-            className={inputCls}
-          >
-            <option value="">No bank account</option>
-            {accounts.map((a) => (
-              <option
-                key={a.id}
-                value={a.id}
-              >
-                {a.accountName || a.bankName}
-              </option>
-            ))}
-          </select>
+            allowEmpty
+            placeholder="No account"
+            options={accounts.map((a) => ({
+              value: String(a.id),
+              label: a.accountName || a.bankName,
+            }))}
+            className={selectCls}
+          />
         </div>
       )}
+
       {!isCash && (
-        <div>
-          <label className={labelCls}>Transaction ID</label>
+        <div className={box}>
+          {!compact && <label className={fieldLabelCls}>Transaction ID</label>}
           <input
-            placeholder="Transaction / UTR / cheque no."
+            placeholder={compact ? "Txn ID" : "Transaction / UTR / cheque no."}
             value={reference}
             onChange={(e) => setReference(e.target.value)}
-            className={inputCls}
+            className={`${fieldCls} ${compact ? "py-1.5 sm:text-sm" : ""}`}
           />
         </div>
       )}

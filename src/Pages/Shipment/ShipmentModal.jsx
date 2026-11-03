@@ -182,7 +182,7 @@ const ShipmentModal = ({
         role="dialog"
         aria-modal="true"
         aria-label="Create shipment"
-        className="flex max-h-[94vh] w-full max-w-6xl flex-col overflow-hidden rounded-t-2xl border border-slate-200 bg-white shadow-2xl sm:max-h-[92vh] sm:rounded-2xl"
+        className="flex max-h-[94dvh] w-full max-w-6xl flex-col overflow-hidden rounded-t-2xl border border-slate-200 bg-white shadow-2xl sm:max-h-[92dvh] sm:rounded-2xl"
       >
         {/* ============ HEADER ============ */}
         <div className="flex shrink-0 items-center justify-between gap-3 bg-gradient-to-r from-blue-600 to-blue-500 px-4 py-3 text-white sm:px-6">

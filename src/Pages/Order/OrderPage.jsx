@@ -12,16 +12,18 @@ import {fetchCustomers, createCustomer} from "../../api/customerApi";
 import {fetchAllProducts} from "../../api/productApi";
 
 import OrderList from "./OrderList";
-import CreateOrderModal from "./CreateOrderModal";
-import PaymentModal from "../Payment/PaymentModal";
-import InstallmentPlanModal from "../../Components/InstallmentPlanModal";
-import InvoiceModal from "../Payment/InvoiceModal";
 import Toast from "../../Components/Toast";
 import {
   INITIAL_ORDER_FILTERS,
   toOrderQuery,
   isInvalidOrderRange,
 } from "../../utils/orderFilters";
+import {lazyModal} from "../../utils/lazyModal";
+
+const CreateOrderModal = lazyModal(() => import("./CreateOrderModal"));
+const PaymentModal = lazyModal(() => import("../Payment/PaymentModal"));
+const InstallmentPlanModal = lazyModal(() => import("../../Components/InstallmentPlanModal"));
+const InvoiceModal = lazyModal(() => import("../Payment/InvoiceModal"));
 
 const OrderPage = () => {
   const queryClient = useQueryClient();

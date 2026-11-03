@@ -12,9 +12,9 @@ const Pagination = ({
   if (totalItems === 0) return null;
 
   return (
-    <div className="flex justify-end pt-2 text-sm text-slate-600">
+    <div className="flex justify-center pt-2 text-sm text-slate-600 sm:justify-end">
       {/* Bottom-right controls */}
-      <div className="flex flex-wrap items-center justify-end gap-4">
+      <div className="flex flex-wrap items-center justify-center gap-3 sm:justify-end sm:gap-4">
         {/* Page buttons navigation */}
         <div className="flex items-center gap-1">
           {/* Previous */}
