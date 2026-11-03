@@ -241,7 +241,7 @@ export default function InstallmentRow({
             onClick={onPrint}
             title="Print invoice of this installment"
             aria-label={`Print invoice of installment ${inst.installmentNumber}`}
-            className="inline-flex cursor-pointer items-center justify-center rounded-md border border-slate-300 bg-white p-2 text-slate-700 hover:bg-slate-50"
+            className="inline-flex cursor-pointer items-center justify-center rounded-md border border-slate-300 bg-white  text-slate-700 hover:bg-slate-50"
           >
             <Printer className="h-4 w-4" />
           </button>
