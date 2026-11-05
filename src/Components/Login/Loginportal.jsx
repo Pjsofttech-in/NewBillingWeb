@@ -1,27 +1,27 @@
-import { useState } from "react";
-import { useForm } from "react-hook-form";
+import {useState} from "react";
+import {useForm} from "react-hook-form";
 import PortalGrid from "./PortalGrid";
 import AccessNav from "./AccessNav";
 import BrandMark from "./BrandMark";
 import LoginPanel from "./Loginpanel";
-import { authTabs } from "../../data/AuthTabs";
-import { useNavigate } from "react-router-dom";
-import { loginUserApi } from "../../api/authApi";
-import { useAuth } from "../../Context/AuthContext";
+import {authTabs} from "../../data/AuthTabs";
+import {useNavigate} from "react-router-dom";
+import {loginUserApi} from "../../api/authApi";
+import {useAuth} from "../../Context/AuthContext";
 
 export default function LoginPortal() {
   const [activeId, setActiveId] = useState(authTabs[0].id);
   const activeTab = authTabs.find((t) => t.id === activeId) ?? authTabs[0];
 
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const {login} = useAuth();
   const [isLoading, setIsLoading] = useState(false);
 
   const {
     register,
     handleSubmit,
     reset,
-    formState: { errors },
+    formState: {errors},
   } = useForm();
 
   const handleFormSubmit = async (data) => {
@@ -35,7 +35,7 @@ export default function LoginPortal() {
       if (response?.token) {
         login(response);
         reset();
-        navigate("/", { replace: true });
+        navigate("/", {replace: true});
       } else {
         alert("Login Failed! Invalid credentials.");
       }
@@ -43,7 +43,7 @@ export default function LoginPortal() {
       alert(
         error?.message === "Invalid Credentials"
           ? "Invalid Credentials! Please check your username and password."
-          : error?.response?.data || "Login failed! Please try again."
+          : error?.response?.data || "Login failed! Please try again.",
       );
     } finally {
       setIsLoading(false);
